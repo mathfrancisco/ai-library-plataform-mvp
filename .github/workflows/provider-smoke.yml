@@ -1,0 +1,81 @@
+name: Provider smoke test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  providers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: CHAVES
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GOOGLE_BOOKS_API_KEY: ${{ secrets.GOOGLE_BOOKS_API_KEY }}
+      OPEN_LIBRARY_USER_AGENT: ${{ secrets.OPEN_LIBRARY_USER_AGENT }}
+    steps:
+      - name: Check provider credentials and responses
+        shell: python
+        run: |
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          def request(name, url, headers=None, payload=None):
+              data = None if payload is None else json.dumps(payload).encode()
+              req = urllib.request.Request(url, data=data, headers=headers or {})
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as exc:
+                  raise RuntimeError(f"{name}: HTTP {exc.code}") from None
+              except urllib.error.URLError:
+                  raise RuntimeError(f"{name}: network request failed") from None
+
+          for name in ("GROQ_API_KEY", "GOOGLE_BOOKS_API_KEY", "OPEN_LIBRARY_USER_AGENT"):
+              if not os.environ.get(name, "").strip():
+                  sys.exit(f"Missing environment secret: {name}")
+
+          try:
+              groq = request(
+                  "Groq",
+                  "https://api.groq.com/openai/v1/chat/completions",
+                  {
+                      "Authorization": "Bearer " + os.environ["GROQ_API_KEY"],
+                      "Content-Type": "application/json",
+                  },
+                  {
+                      "model": "llama-3.1-8b-instant",
+                      "messages": [{"role": "user", "content": "Reply OK"}],
+                      "max_tokens": 8,
+                  },
+              )
+              if not groq.get("choices"):
+                  raise RuntimeError("Groq: response has no choices")
+              print("Groq: OK")
+
+              google_url = "https://www.googleapis.com/books/v1/volumes?" + urllib.parse.urlencode({
+                  "q": "isbn:9780140328721",
+                  "maxResults": 1,
+                  "key": os.environ["GOOGLE_BOOKS_API_KEY"],
+              })
+              google = request("Google Books", google_url)
+              if not google.get("items"):
+                  raise RuntimeError("Google Books: response has no items")
+              print("Google Books: OK")
+
+              open_library = request(
+                  "Open Library",
+                  "https://openlibrary.org/search.json?q=matilda&limit=1",
+                  {"User-Agent": os.environ["OPEN_LIBRARY_USER_AGENT"]},
+              )
+              if not open_library.get("docs"):
+                  raise RuntimeError("Open Library: response has no docs")
+              print("Open Library: OK")
+          except RuntimeError as exc:
+              sys.exit(str(exc))
