@@ -1,0 +1,14 @@
+sequenceDiagram
+  participant UI
+  participant API
+  participant FTS
+  participant Vec
+  participant Ext as External Catalog
+  UI->>API: query
+  par
+    API->>FTS: lexical
+    API->>Vec: semantic
+    API->>Ext: external
+  end
+  API->>API: RRF + dedupe
+  API-->>UI: ranked results

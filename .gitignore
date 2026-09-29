@@ -1,0 +1,26 @@
+# env
+.env
+.env.*
+!.env.example
+
+# Java
+backend/target/
+*.class
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Runtime
+uploads/
+*.log
+
+# TypeScript incremental build metadata
+*.tsbuildinfo

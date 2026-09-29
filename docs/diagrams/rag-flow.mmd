@@ -1,0 +1,3 @@
+flowchart LR
+  Upload --> Validate --> Tika --> Splitter[TokenTextSplitter] --> Embed --> PGV[(pgvector)]
+  Question --> Filter[ownerId + documentId filter] --> PGV --> Context --> ChatClient --> Answer
