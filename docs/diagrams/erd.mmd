@@ -1,0 +1,8 @@
+erDiagram
+  USERS ||--o{ USER_LIBRARY : owns
+  BOOKS ||--o{ USER_LIBRARY : contains
+  USERS ||--o{ DOCUMENTS : uploads
+  BOOKS o|--o{ DOCUMENTS : attaches
+  BOOKS ||--o{ EXTERNAL_BOOK_REFS : maps
+  USERS ||--o{ READING_PROGRESS : tracks
+  BOOKS ||--o{ READING_PROGRESS : tracks

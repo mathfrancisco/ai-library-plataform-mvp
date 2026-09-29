@@ -1,0 +1,6 @@
+flowchart LR
+  Reader[Reader] --> Platform[AI Library Platform]
+  Platform --> OL[Open Library]
+  Platform --> GB[Google Books]
+  Platform --> LLM[LLM / Embedding Provider]
+  Platform --> PG[(PostgreSQL + pgvector)]
