@@ -21,29 +21,34 @@ jobs:
         run: |
           import json
           import os
+          import re
           import sys
           import urllib.error
           import urllib.parse
           import urllib.request
 
-          def request(name, url, headers=None, payload=None):
+          def request(url, headers=None, payload=None):
               data = None if payload is None else json.dumps(payload).encode()
               req = urllib.request.Request(url, data=data, headers=headers or {})
               try:
                   with urllib.request.urlopen(req, timeout=20) as response:
                       return json.load(response)
               except urllib.error.HTTPError as exc:
-                  raise RuntimeError(f"{name}: HTTP {exc.code}") from None
+                  try:
+                      code = json.load(exc).get("error", {}).get("code", "")
+                  except (ValueError, AttributeError):
+                      code = ""
+                  detail = f" ({code})" if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,80}", code) else ""
+                  raise RuntimeError(f"HTTP {exc.code}{detail}") from None
               except urllib.error.URLError:
-                  raise RuntimeError(f"{name}: network request failed") from None
+                  raise RuntimeError("network request failed") from None
 
           for name in ("GROQ_API_KEY", "GOOGLE_BOOKS_API_KEY", "OPEN_LIBRARY_USER_AGENT"):
               if not os.environ.get(name, "").strip():
                   sys.exit(f"Missing environment secret: {name}")
 
-          try:
+          def check_groq():
               groq = request(
-                  "Groq",
                   "https://api.groq.com/openai/v1/chat/completions",
                   {
                       "Authorization": "Bearer " + os.environ["GROQ_API_KEY"],
@@ -56,26 +61,33 @@ jobs:
                   },
               )
               if not groq.get("choices"):
-                  raise RuntimeError("Groq: response has no choices")
-              print("Groq: OK")
+                  raise RuntimeError("response has no choices")
 
+          def check_google():
               google_url = "https://www.googleapis.com/books/v1/volumes?" + urllib.parse.urlencode({
                   "q": "isbn:9780140328721",
                   "maxResults": 1,
                   "key": os.environ["GOOGLE_BOOKS_API_KEY"],
               })
-              google = request("Google Books", google_url)
+              google = request(google_url)
               if not google.get("items"):
-                  raise RuntimeError("Google Books: response has no items")
-              print("Google Books: OK")
+                  raise RuntimeError("response has no items")
 
+          def check_open_library():
               open_library = request(
-                  "Open Library",
                   "https://openlibrary.org/search.json?q=matilda&limit=1",
                   {"User-Agent": os.environ["OPEN_LIBRARY_USER_AGENT"]},
               )
               if not open_library.get("docs"):
-                  raise RuntimeError("Open Library: response has no docs")
-              print("Open Library: OK")
-          except RuntimeError as exc:
-              sys.exit(str(exc))
+                  raise RuntimeError("response has no docs")
+
+          failures = []
+          for name, check in (("Groq", check_groq), ("Google Books", check_google), ("Open Library", check_open_library)):
+              try:
+                  check()
+                  print(f"{name}: OK")
+              except RuntimeError as exc:
+                  print(f"{name}: {exc}")
+                  failures.append(name)
+          if failures:
+              sys.exit(1)
