@@ -47,7 +47,15 @@ jobs:
               if not os.environ.get(name, "").strip():
                   sys.exit(f"Missing environment secret: {name}")
 
-          def check_groq():
+          def check_groq_models():
+              models = request(
+                  "https://api.groq.com/openai/v1/models",
+                  {"Authorization": "Bearer " + os.environ["GROQ_API_KEY"]},
+              )
+              if not models.get("data"):
+                  raise RuntimeError("response has no models")
+
+          def check_groq_chat():
               groq = request(
                   "https://api.groq.com/openai/v1/chat/completions",
                   {
@@ -82,7 +90,12 @@ jobs:
                   raise RuntimeError("response has no docs")
 
           failures = []
-          for name, check in (("Groq", check_groq), ("Google Books", check_google), ("Open Library", check_open_library)):
+          for name, check in (
+              ("Groq models", check_groq_models),
+              ("Groq chat", check_groq_chat),
+              ("Google Books", check_google),
+              ("Open Library", check_open_library),
+          ):
               try:
                   check()
                   print(f"{name}: OK")
