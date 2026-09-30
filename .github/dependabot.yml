@@ -18,6 +18,10 @@ updates:
         patterns: ["next", "react", "react-dom", "eslint-config-next", "@types/react*"]
       testing:
         patterns: ["vitest", "@testing-library/*", "msw", "jsdom"]
+    ignore:
+      # TypeScript 7 (native compiler) has no JS API yet; typescript-eslint via eslint-config-next needs < 6.1.
+      - dependency-name: typescript
+        versions: [">=6.1.0"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
