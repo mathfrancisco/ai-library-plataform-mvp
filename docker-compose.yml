@@ -1,3 +1,4 @@
+# Works without a .env file; every value has a default. Copy .env.example to .env to override.
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -6,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ailibrary}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ailibrary}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432" # loopback only
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -17,32 +18,52 @@ services:
 
   backend:
     build: ./backend
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ailibrary}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-ailibrary}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-ailibrary}
       APP_UPLOAD_DIR: /data/uploads
+      AI_EMBEDDING_CACHE_DIR: /data/onnx-cache
+      DJL_CACHE_DIR: /data/onnx-cache/djl
+      AI_ENABLED: ${AI_ENABLED:-false}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me-with-at-least-32-characters-long-secret}
+      APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-http://localhost:3000}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - uploads:/data/uploads
+      - onnx-cache:/data/onnx-cache # ~90 MB embedding model, downloaded once
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    build: ./frontend
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      # Server-side target of the /api proxy (read at runtime by src/proxy.ts).
+      API_INTERNAL_URL: http://backend:8080
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   pgdata:
   uploads:
+  onnx-cache:

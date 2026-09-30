@@ -1,0 +1,16 @@
+# Database only, for running backend (./mvnw spring-boot:run) and frontend (npm run dev) on the host:
+#   docker compose -f docker-compose.dev.yml up -d
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ailibrary
+      POSTGRES_USER: ailibrary
+      POSTGRES_PASSWORD: ailibrary
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+
+volumes:
+  pgdata-dev:

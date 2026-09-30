@@ -1,3 +1,5 @@
-target
-uploads
+target/
+.idea/
+*.iml
+uploads/
 .env*
