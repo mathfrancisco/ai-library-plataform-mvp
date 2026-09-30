@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /app
 COPY mvnw pom.xml ./
 COPY .mvn .mvn
@@ -8,7 +8,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -q -B -DskipTests package \
     && java -Djarmode=tools -jar target/ai-library-backend-*.jar extract --layers --launcher --destination extracted
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 # curl for the compose healthcheck; a non-root user owning the data directories.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
