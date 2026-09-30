@@ -22,6 +22,12 @@ updates:
       # TypeScript 7 (native compiler) has no JS API yet; typescript-eslint via eslint-config-next needs < 6.1.
       - dependency-name: typescript
         versions: [">=6.1.0"]
+      # eslint-plugin-react (through eslint-config-next) fails on ESLint 10 (context.getFilename removed).
+      - dependency-name: eslint
+        versions: [">=10.0.0"]
+      # Types follow the Node runtime (node:22 in Docker and CI).
+      - dependency-name: "@types/node"
+        versions: [">=23.0.0"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
