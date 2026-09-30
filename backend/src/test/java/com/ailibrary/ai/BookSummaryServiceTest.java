@@ -60,7 +60,8 @@ class BookSummaryServiceTest {
     void refusesToSummarizeWithoutSource() {
         Book book = new Book(null, null, "Empty", null, null, null, "  ", null, null, null, null, null, false);
         when(books.getEntity(book.getId())).thenReturn(book);
-        assertThatThrownBy(() -> service.summarize(user, book.getId(), FULL)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.summarize(user, book.getId(), TAKEAWAYS))
+                .isInstanceOf(BadRequestException.class);
         verifyNoInteractions(ai);
     }
 }

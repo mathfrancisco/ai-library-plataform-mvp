@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class JwtService {
+    static final String ISSUER = "ai-library";
+
     private final JwtEncoder encoder;
     private final JwtDecoder decoder;
     private final AuthProperties properties;
@@ -23,15 +25,17 @@ public class JwtService {
         }
         SecretKey key = new SecretKeySpec(bytes, "HmacSHA256");
         this.encoder = new NimbusJwtEncoder(new com.nimbusds.jose.jwk.source.ImmutableSecret<>(key));
-        this.decoder = NimbusJwtDecoder.withSecretKey(key)
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(ISSUER));
+        this.decoder = decoder;
     }
 
     public String issueAccessToken(User user) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
-                .issuer("ai-library")
+                .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(properties.accessTtlMinutes() * 60))
                 .subject(user.getId().toString())

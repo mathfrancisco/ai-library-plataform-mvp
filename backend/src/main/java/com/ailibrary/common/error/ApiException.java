@@ -2,22 +2,24 @@ package com.ailibrary.common.error;
 
 import org.springframework.http.HttpStatus;
 
-/** Base type for errors that map to a stable, client-visible error code. */
+/** Base type for errors that map to a stable, client-visible {@link ErrorCode}. */
 public class ApiException extends RuntimeException {
-    private final HttpStatus status;
-    private final String code;
+    private final ErrorCode code;
 
-    public ApiException(HttpStatus status, String code, String message) {
+    public ApiException(ErrorCode code, String message) {
         super(message);
-        this.status = status;
         this.code = code;
     }
 
     public HttpStatus status() {
-        return status;
+        return code.status();
     }
 
     public String code() {
+        return code.name();
+    }
+
+    public ErrorCode errorCode() {
         return code;
     }
 }

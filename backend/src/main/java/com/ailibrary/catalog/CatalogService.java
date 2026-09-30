@@ -9,6 +9,7 @@ import com.ailibrary.book.service.BookFingerprint;
 import com.ailibrary.book.service.BookMapper;
 import com.ailibrary.book.service.BookVectorIndexer;
 import com.ailibrary.common.error.BadRequestException;
+import com.ailibrary.common.error.ErrorCode;
 import com.ailibrary.common.error.NotFoundException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -92,10 +93,10 @@ public class CatalogService {
         BookCatalogProvider provider = providers.stream()
                 .filter(p -> p.providerName().equalsIgnoreCase(providerName) && p.enabled())
                 .findFirst()
-                .orElseThrow(
-                        () -> new BadRequestException("PROVIDER_UNAVAILABLE", "Catalog provider is not available"));
+                .orElseThrow(() ->
+                        new BadRequestException(ErrorCode.PROVIDER_UNAVAILABLE, "Catalog provider is not available"));
         CatalogBook source = provider.get(externalId)
-                .orElseThrow(() -> new NotFoundException("EXTERNAL_BOOK_NOT_FOUND", "External book not found"));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.EXTERNAL_BOOK_NOT_FOUND, "External book not found"));
 
         Optional<Book> existing = findExisting(source);
         Book book = existing.orElseGet(() -> books.save(new Book(

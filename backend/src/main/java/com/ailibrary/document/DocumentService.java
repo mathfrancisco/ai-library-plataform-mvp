@@ -2,6 +2,7 @@ package com.ailibrary.document;
 
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.error.BadRequestException;
+import com.ailibrary.common.error.ErrorCode;
 import com.ailibrary.common.error.NotFoundException;
 import com.ailibrary.document.domain.UserDocument;
 import com.ailibrary.document.repository.UserDocumentRepository;
@@ -42,22 +43,22 @@ public class DocumentService {
 
     @Transactional
     public DocumentView upload(UUID owner, UUID bookId, MultipartFile file) {
-        if (file.isEmpty()) throw new BadRequestException("EMPTY_FILE", "File is empty");
+        if (file.isEmpty()) throw new BadRequestException(ErrorCode.EMPTY_FILE, "File is empty");
         if (file.getSize() > props.maxBytes())
-            throw new BadRequestException("FILE_TOO_LARGE", "File exceeds maximum size");
+            throw new BadRequestException(ErrorCode.FILE_TOO_LARGE, "File exceeds maximum size");
         if (bookId != null && !books.existsById(bookId)) throw NotFoundException.book();
         String original = displayName(file.getOriginalFilename());
         String ext = extension(original);
         if (!EXT.contains(ext))
-            throw new BadRequestException("UNSUPPORTED_FILE_TYPE", "Allowed formats: PDF, EPUB, TXT, MD");
+            throw new BadRequestException(ErrorCode.UNSUPPORTED_FILE_TYPE, "Allowed formats: PDF, EPUB, TXT, MD");
         String contentType = Optional.ofNullable(file.getContentType())
                 .orElse("application/octet-stream")
                 .toLowerCase(Locale.ROOT);
         if (!contentTypeAllowed(ext, contentType))
             throw new BadRequestException(
-                    "UNSUPPORTED_FILE_TYPE", "File content type does not match an allowed document format");
+                    ErrorCode.UNSUPPORTED_FILE_TYPE, "File content type does not match an allowed document format");
         if (!detectedTypeAllowed(ext, detect(file)))
-            throw new BadRequestException("UNSUPPORTED_FILE_TYPE", "File content does not match its extension");
+            throw new BadRequestException(ErrorCode.UNSUPPORTED_FILE_TYPE, "File content does not match its extension");
         try {
             Path root = Path.of(props.dir()).toAbsolutePath().normalize();
             Files.createDirectories(root);

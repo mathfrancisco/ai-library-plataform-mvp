@@ -1,6 +1,7 @@
 package com.ailibrary.rag;
 
 import com.ailibrary.common.error.BadRequestException;
+import com.ailibrary.common.error.ErrorCode;
 import com.ailibrary.common.vector.VectorFilters;
 import com.ailibrary.document.domain.DocumentStatus;
 import com.ailibrary.document.repository.UserDocumentRepository;
@@ -24,7 +25,7 @@ public class BookRagService {
         if (docs.findByOwnerIdAndBookIdAndStatus(owner, bookId, DocumentStatus.READY)
                 .isEmpty())
             throw new BadRequestException(
-                    "NO_BOOK_DOCUMENTS", "Upload a permitted document for this book before using book chat");
+                    ErrorCode.NO_BOOK_DOCUMENTS, "Upload a permitted document for this book before using book chat");
         return grounded.answer(
                 owner,
                 "BOOK_RAG",

@@ -3,6 +3,7 @@ package com.ailibrary.auth.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 import java.util.UUID;
 
 public final class AuthDtos {
@@ -21,5 +22,12 @@ public final class AuthDtos {
 
     public record AuthResponse(String accessToken, String refreshToken, UserView user) {}
 
-    public record UserView(UUID id, String email, String displayName, String role) {}
+    public record UserView(UUID id, String email, String displayName, String role, Instant createdAt) {}
+
+    public record UpdateProfileRequest(@NotBlank @Size(max = 120) String displayName) {}
+
+    public record ChangePasswordRequest(
+            @NotBlank String currentPassword, @NotBlank @Size(min = 8, max = 100) String newPassword) {}
+
+    public record DeleteAccountRequest(@NotBlank String password) {}
 }

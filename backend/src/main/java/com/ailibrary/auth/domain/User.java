@@ -36,6 +36,14 @@ public class User {
         this.role = Role.USER;
     }
 
+    public void rename(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
     public void promoteToAdmin() {
         this.role = Role.ADMIN;
     }

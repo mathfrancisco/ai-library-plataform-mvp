@@ -5,9 +5,9 @@ import com.ailibrary.book.dto.BookView;
 import com.ailibrary.book.dto.CreateBookRequest;
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.error.ApiException;
+import com.ailibrary.common.error.ErrorCode;
 import com.ailibrary.common.error.NotFoundException;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +31,7 @@ public class BookService {
         String isbn13 = BookFingerprint.isbn13(request.isbn13());
         if (isbn13 == null) isbn13 = BookFingerprint.isbn10To13(request.isbn10());
         if (isbn13 != null && books.findByIsbn13(isbn13).isPresent())
-            throw new ApiException(HttpStatus.CONFLICT, "BOOK_ALREADY_EXISTS", "A book with this ISBN already exists");
+            throw new ApiException(ErrorCode.BOOK_ALREADY_EXISTS, "A book with this ISBN already exists");
         Book entity = new Book(
                 isbn13,
                 BookFingerprint.isbn10(request.isbn10()),

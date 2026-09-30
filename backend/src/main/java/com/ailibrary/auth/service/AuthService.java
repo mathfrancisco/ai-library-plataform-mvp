@@ -6,6 +6,7 @@ import com.ailibrary.auth.dto.AuthDtos.*;
 import com.ailibrary.auth.repository.RefreshTokenRepository;
 import com.ailibrary.auth.repository.UserRepository;
 import com.ailibrary.common.error.ApiException;
+import com.ailibrary.common.error.ErrorCode;
 import com.ailibrary.common.error.NotFoundException;
 import com.ailibrary.common.security.AuthProperties;
 import com.ailibrary.common.security.JwtService;
@@ -17,7 +18,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,14 +49,18 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         String email = request.email().trim().toLowerCase();
         if (users.existsByEmailIgnoreCase(email)) {
-            throw new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "Email already registered");
+            throw emailTaken();
         }
         User user = new User(
                 email,
                 passwordEncoder.encode(request.password()),
                 request.displayName().trim());
         if (properties.adminEmails().contains(email)) user.promoteToAdmin();
-        user = users.save(user);
+        try {
+            user = users.saveAndFlush(user);
+        } catch (DataIntegrityViolationException concurrentRegistration) {
+            throw emailTaken();
+        }
         return issuePair(user);
     }
 
@@ -68,17 +73,25 @@ public class AuthService {
         return issuePair(user);
     }
 
-    @Transactional
+    /**
+     * Rotates the refresh token. Presenting an already-revoked token means it was copied and reused, so every
+     * session of that user is revoked (reuse detection). Committed even though the request fails.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
     public AuthResponse refresh(RefreshRequest request) {
         RefreshToken current = refreshTokens
                 .findByTokenHash(hash(request.refreshToken()))
                 .orElseThrow(() -> invalidRefresh("Invalid refresh token"));
+        if (current.getRevokedAt() != null) {
+            refreshTokens.revokeAll(current.getUserId(), Instant.now());
+            throw invalidRefresh("Refresh token was already used; all sessions were signed out");
+        }
         if (!current.isUsable()) {
-            throw invalidRefresh("Refresh token expired or revoked");
+            throw invalidRefresh("Refresh token expired");
         }
         current.revoke();
         User user = users.findById(current.getUserId())
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "User not found"));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND, "User not found"));
         return issuePair(user);
     }
 
@@ -89,8 +102,48 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public UserView getUser(UUID id) {
-        User user = users.findById(id).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "User not found"));
+        User user =
+                users.findById(id).orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND, "User not found"));
         return toView(user);
+    }
+
+    @Transactional
+    public void logoutAll(UUID userId) {
+        refreshTokens.revokeAll(userId, Instant.now());
+    }
+
+    @Transactional
+    public UserView updateProfile(UUID userId, UpdateProfileRequest request) {
+        User user = user(userId);
+        user.rename(request.displayName().trim());
+        return toView(user);
+    }
+
+    /** Changing the password signs out every other session and returns a fresh pair for this one. */
+    @Transactional
+    public AuthResponse changePassword(UUID userId, ChangePasswordRequest request) {
+        User user = user(userId);
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new ApiException(ErrorCode.WRONG_PASSWORD, "Current password is incorrect");
+        }
+        user.changePasswordHash(passwordEncoder.encode(request.newPassword()));
+        refreshTokens.revokeAll(userId, Instant.now());
+        return issuePair(user);
+    }
+
+    @Transactional(readOnly = true)
+    public void verifyPassword(UUID userId, String password) {
+        if (!passwordEncoder.matches(password, user(userId).getPasswordHash())) {
+            throw new ApiException(ErrorCode.WRONG_PASSWORD, "Password is incorrect");
+        }
+    }
+
+    private User user(UUID id) {
+        return users.findById(id).orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND, "User not found"));
+    }
+
+    private static ApiException emailTaken() {
+        return new ApiException(ErrorCode.EMAIL_TAKEN, "Email already registered");
     }
 
     private AuthResponse issuePair(User user) {
@@ -106,15 +159,16 @@ public class AuthService {
                 user.getId(),
                 user.getEmail(),
                 user.getDisplayName(),
-                user.getRole().name());
+                user.getRole().name(),
+                user.getCreatedAt());
     }
 
     private static ApiException invalidCredentials() {
-        return new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid credentials");
+        return new ApiException(ErrorCode.INVALID_CREDENTIALS, "Invalid credentials");
     }
 
     private static ApiException invalidRefresh(String message) {
-        return new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", message);
+        return new ApiException(ErrorCode.INVALID_REFRESH_TOKEN, message);
     }
 
     private String randomToken() {

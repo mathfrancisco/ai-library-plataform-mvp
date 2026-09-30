@@ -5,6 +5,7 @@ import com.ailibrary.ai.repository.AiGenerationRepository;
 import com.ailibrary.book.domain.Book;
 import com.ailibrary.book.service.BookService;
 import com.ailibrary.common.error.BadRequestException;
+import com.ailibrary.common.error.ErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -18,7 +19,6 @@ public class BookSummaryService {
     public enum SummaryType {
         TLDR,
         SHORT,
-        FULL,
         TAKEAWAYS
     }
 
@@ -39,7 +39,7 @@ public class BookSummaryService {
         Book book = books.getEntity(bookId);
         if (book.getDescription() == null || book.getDescription().isBlank())
             throw new BadRequestException(
-                    "NO_SUMMARY_SOURCE",
+                    ErrorCode.NO_SUMMARY_SOURCE,
                     "This book has no source description to summarize. Upload permitted full text for grounded RAG.");
         String source =
                 book.getTitle() + "\n" + Objects.toString(book.getAuthorNames(), "") + "\n" + book.getDescription();
@@ -52,8 +52,7 @@ public class BookSummaryService {
                 userId,
                 "BOOK_SUMMARY",
                 ModelTier.FAST,
-                "You summarize only the supplied source. Never invent book contents beyond it. "
-                        + "Clearly state that this is based on catalog metadata/description. " + instruction(type),
+                AiPromptTemplates.SUMMARY_SYSTEM + AiPromptTemplates.summaryInstruction(type),
                 source);
         try {
             cache.save(new AiGeneration(
@@ -82,15 +81,6 @@ public class BookSummaryService {
                 Objects.toString(model, ""),
                 PROMPT_VERSION,
                 "type=" + type));
-    }
-
-    private static String instruction(SummaryType type) {
-        return switch (type) {
-            case TLDR -> "Return one compact paragraph.";
-            case SHORT -> "Return 2-3 concise paragraphs.";
-            case FULL -> "Return a detailed structured summary of the supplied catalog description only.";
-            case TAKEAWAYS -> "Return 5-8 key takeaways supported by the supplied description.";
-        };
     }
 
     private static String sha256(String value) {

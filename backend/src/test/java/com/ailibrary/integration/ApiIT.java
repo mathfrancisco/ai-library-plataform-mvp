@@ -30,7 +30,7 @@ class ApiIT extends PostgresIntegrationTest {
     void privateEndpointsRequireAuthenticationWithEnvelope() throws Exception {
         Res res = call("GET", "/api/library", null, null);
         assertThat(res.status()).isEqualTo(401);
-        assertThat(res.body().path("code").asString()).isEqualTo("UNAUTHENTICATED");
+        assertThat(res.body().path("code").asString()).isEqualTo("UNAUTHORIZED");
         assertThat(res.body().path("path").asString()).isEqualTo("/api/library");
     }
 
@@ -53,7 +53,9 @@ class ApiIT extends PostgresIntegrationTest {
         assertThat(progress.body().path("startedAt").isNull()).isFalse();
 
         assertThat(call("GET", "/api/library", bob, null).body().size()).isZero();
-        assertThat(call("GET", "/api/reading/" + bookId, bob, null).status()).isEqualTo(404);
+        Res bobProgress = call("GET", "/api/reading/" + bookId, bob, null);
+        assertThat(bobProgress.status()).isEqualTo(200);
+        assertThat(bobProgress.body().path("exists").asBoolean()).isFalse();
         assertThat(call("DELETE", "/api/library/books/" + bookId, bob, null).status())
                 .isEqualTo(404);
         assertThat(call("GET", "/api/library", alice, null).body().size()).isEqualTo(1);

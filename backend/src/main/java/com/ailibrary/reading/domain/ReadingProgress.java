@@ -2,6 +2,7 @@ package com.ailibrary.reading.domain;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -32,6 +33,9 @@ public class ReadingProgress {
     @Column(columnDefinition = "text")
     private String notes;
 
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt = Instant.now();
+
     protected ReadingProgress() {}
 
     public ReadingProgress(UUID userId, UUID bookId) {
@@ -47,6 +51,11 @@ public class ReadingProgress {
         if (startedAt != null) this.startedAt = startedAt;
         if (completedAt != null) this.completedAt = completedAt;
         if (notes != null) this.notes = notes;
+        this.updatedAt = Instant.now();
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     public UUID getId() {

@@ -5,6 +5,7 @@ import com.ailibrary.common.error.AiException;
 import com.ailibrary.common.error.ApiException;
 import java.net.SocketTimeoutException;
 import java.net.http.HttpTimeoutException;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -12,6 +13,7 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -60,12 +62,20 @@ public class AiFacade {
         return holder.entity;
     }
 
-    public String tools(UUID userId, String operation, ModelTier tier, String system, String user, Object... tools) {
-        ChatResponse response = call(
-                userId,
-                operation,
-                tier,
-                spec -> spec.system(system).user(user).tools(tools).call().chatResponse());
+    public String tools(
+            UUID userId,
+            String operation,
+            ModelTier tier,
+            String system,
+            List<Message> history,
+            String user,
+            Object... tools) {
+        ChatResponse response = call(userId, operation, tier, spec -> spec.system(system)
+                .messages(history)
+                .user(user)
+                .tools(tools)
+                .call()
+                .chatResponse());
         return text(response);
     }
 

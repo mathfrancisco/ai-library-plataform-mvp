@@ -4,6 +4,7 @@ import com.ailibrary.common.security.CurrentUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +24,8 @@ public class AiController {
         this.usage = usage;
     }
 
-    public record ChatRequest(@NotBlank @Size(max = 2000) String message) {}
+    public record ChatRequest(
+            @NotBlank @Size(max = 2000) String message, @Size(max = 20) List<AssistantService.Turn> history) {}
 
     public record ChatResponse(String answer) {}
 
@@ -34,7 +36,7 @@ public class AiController {
 
     @PostMapping("/ai/assistant")
     public ChatResponse assistant(@Valid @RequestBody ChatRequest request) {
-        return new ChatResponse(assistant.ask(currentUser.id(), request.message()));
+        return new ChatResponse(assistant.ask(currentUser.id(), request.message(), request.history()));
     }
 
     @PostMapping("/books/{bookId}/summary")

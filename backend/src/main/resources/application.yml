@@ -75,10 +75,10 @@ app:
     # Embeddings run locally, so vector features do not depend on AI_ENABLED.
     enabled: ${VECTOR_ENABLED:true}
   auth:
-    jwt-secret: ${JWT_SECRET:change-me-with-at-least-32-characters-long-secret}
+    jwt-secret: ${JWT_SECRET:change-me-with-at-least-32-characters-long-secret} # rejected in the prod profile
     access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:15}
     refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:30}
-    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    cors-allowed-origins: ${APP_CORS_ORIGINS:http://localhost:3000}
     admin-emails: ${APP_ADMIN_EMAILS:}
   upload:
     dir: ${APP_UPLOAD_DIR:./uploads}

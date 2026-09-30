@@ -3,6 +3,7 @@ package com.ailibrary.book.service;
 import com.ailibrary.book.domain.Book;
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.error.ApiException;
+import com.ailibrary.common.error.ErrorCode;
 import com.ailibrary.common.vector.VectorFilters;
 import com.ailibrary.common.vector.VectorStoreAccess;
 import java.nio.charset.StandardCharsets;
@@ -15,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -32,9 +32,7 @@ public class BookVectorIndexer {
     public int reindexAll(BookRepository books) {
         var store = vectors.store()
                 .orElseThrow(() -> new ApiException(
-                        HttpStatus.SERVICE_UNAVAILABLE,
-                        "VECTOR_DISABLED",
-                        "Vector search is disabled (VECTOR_ENABLED=false)"));
+                        ErrorCode.VECTOR_DISABLED, "Vector search is disabled (VECTOR_ENABLED=false)"));
         int count = 0;
         var page = books.findAll(PageRequest.of(0, 100, Sort.by("id")));
         while (true) {

@@ -31,6 +31,9 @@ public class UserLibraryItem {
     @Column(name = "added_at", nullable = false, updatable = false)
     private Instant addedAt = Instant.now();
 
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt = Instant.now();
+
     protected UserLibraryItem() {}
 
     public UserLibraryItem(UUID userId, UUID bookId, LibraryStatus status) {
@@ -68,9 +71,15 @@ public class UserLibraryItem {
         return addedAt;
     }
 
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    /** Null means "leave unchanged"; a rating of 0 clears the rating. */
     public void update(LibraryStatus status, Boolean favorite, Integer rating) {
         if (status != null) this.status = status;
         if (favorite != null) this.favorite = favorite;
-        if (rating != null) this.rating = rating;
+        if (rating != null) this.rating = rating == 0 ? null : rating;
+        this.updatedAt = Instant.now();
     }
 }
