@@ -9,6 +9,7 @@ import com.ailibrary.library.domain.UserLibraryItem;
 import com.ailibrary.library.dto.LibraryDtos.LibraryItemView;
 import com.ailibrary.library.dto.LibraryDtos.UpsertRequest;
 import com.ailibrary.library.repository.UserLibraryRepository;
+import com.ailibrary.reading.service.ReadingProgressService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,20 +19,24 @@ import java.util.*;
 public class LibraryService {
     private final UserLibraryRepository library;
     private final BookRepository books;
+    private final ReadingProgressService reading;
 
-    public LibraryService(UserLibraryRepository library, BookRepository books) {
+    public LibraryService(UserLibraryRepository library, BookRepository books, ReadingProgressService reading) {
         this.library = library;
         this.books = books;
+        this.reading = reading;
     }
 
     @Transactional
     public LibraryItemView upsert(UUID userId, UUID bookId, UpsertRequest request) {
-        Book book = books.findById(bookId).orElseThrow(() -> new NotFoundException("Book not found"));
-        UserLibraryItem item = library.findByUserIdAndBookId(userId, bookId)
-                .orElseGet(() -> new UserLibraryItem(userId, bookId,
-                        request.status() == null ? LibraryStatus.WANT_TO_READ : request.status()));
+        Book book = books.findById(bookId).orElseThrow(NotFoundException::book);
+        Optional<UserLibraryItem> existing = library.findByUserIdAndBookId(userId, bookId);
+        LibraryStatus previous = existing.map(UserLibraryItem::getStatus).orElse(null);
+        UserLibraryItem item = existing.orElseGet(() -> new UserLibraryItem(userId, bookId,
+                request.status() == null ? LibraryStatus.WANT_TO_READ : request.status()));
         item.update(request.status(), request.favorite(), request.rating());
         item = library.save(item);
+        if (item.getStatus() != previous) reading.onStatusChanged(userId, bookId, item.getStatus());
         return toView(item, book);
     }
 
@@ -48,7 +53,7 @@ public class LibraryService {
     @Transactional
     public void remove(UUID userId, UUID bookId) {
         UserLibraryItem item = library.findByUserIdAndBookId(userId, bookId)
-                .orElseThrow(() -> new NotFoundException("Library item not found"));
+                .orElseThrow(() -> new NotFoundException("LIBRARY_ITEM_NOT_FOUND", "Library item not found"));
         library.delete(item);
     }
 

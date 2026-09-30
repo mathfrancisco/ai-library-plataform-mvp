@@ -5,21 +5,26 @@ import com.ailibrary.book.domain.ExternalBookReference;
 import com.ailibrary.book.dto.BookView;
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.book.repository.ExternalBookReferenceRepository;
+import com.ailibrary.book.service.BookFingerprint;
 import com.ailibrary.book.service.BookMapper;
 import com.ailibrary.book.service.BookVectorIndexer;
 import com.ailibrary.common.error.BadRequestException;
 import com.ailibrary.common.error.NotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.text.Normalizer;
-import java.util.*;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class CatalogService {
+    private static final Logger log = LoggerFactory.getLogger(CatalogService.class);
+    private static final int MAX_CACHED_PAGES = 1000;
+
     private final List<BookCatalogProvider> providers;
     private final BookRepository books;
     private final ExternalBookReferenceRepository refs;
@@ -35,25 +40,36 @@ public class CatalogService {
     }
 
     public CatalogPage search(String query, int page, int size) {
-        String cacheKey = query.trim().toLowerCase(Locale.ROOT)+"|"+page+"|"+size;
+        String cacheKey = query.trim().toLowerCase(Locale.ROOT) + "|" + page + "|" + size;
         CachedPage cached = searchCache.get(cacheKey);
         if (cached != null && cached.expiresAt().isAfter(Instant.now())) return cached.page();
-        LinkedHashMap<String, CatalogBook> merged = new LinkedHashMap<>();
-        long total = 0;
-        for (BookCatalogProvider provider : providers) {
-            if (!provider.enabled()) continue;
+        CatalogPage result = merge(providers.stream().filter(BookCatalogProvider::enabled).map(provider -> {
             try {
-                CatalogPage result = provider.search(query, page, size);
-                total += result.total();
-                for (CatalogBook book : result.items()) merged.putIfAbsent(fingerprint(book), book);
-            } catch (RuntimeException ignored) {
+                return provider.search(query, page, size);
+            } catch (RuntimeException ex) {
                 // Provider failure must not take the whole federated search down.
+                log.warn("Catalog provider {} failed: {}", provider.providerName(), ex.getMessage());
+                return new CatalogPage(List.of(), 0);
             }
-        }
-        CatalogPage result = new CatalogPage(merged.values().stream().limit(size).toList(), total);
-        if (searchCache.size() > 1000) searchCache.clear();
+        }).toList(), size);
+        if (searchCache.size() > MAX_CACHED_PAGES) searchCache.clear();
         searchCache.put(cacheKey, new CachedPage(result, Instant.now().plus(5, ChronoUnit.MINUTES)));
         return result;
+    }
+
+    /** Provider order is priority order; later duplicates (same fingerprint) are dropped. */
+    static CatalogPage merge(List<CatalogPage> pages, int size) {
+        LinkedHashMap<String, CatalogBook> merged = new LinkedHashMap<>();
+        long total = 0;
+        for (CatalogPage page : pages) {
+            total += page.total();
+            for (CatalogBook book : page.items()) merged.putIfAbsent(fingerprint(book), book);
+        }
+        return new CatalogPage(merged.values().stream().limit(size).toList(), total);
+    }
+
+    static String fingerprint(CatalogBook book) {
+        return BookFingerprint.of(book.isbn13(), book.isbn10(), book.title(), book.authors());
     }
 
     private record CachedPage(CatalogPage page, Instant expiresAt) {}
@@ -62,54 +78,44 @@ public class CatalogService {
     public BookView importBook(String providerName, String externalId) {
         ExternalBookReference existingRef = refs.findByProviderAndExternalId(providerName, externalId).orElse(null);
         if (existingRef != null) {
-            return BookMapper.toView(books.findById(existingRef.getBookId()).orElseThrow());
+            return BookMapper.toView(books.findById(existingRef.getBookId()).orElseThrow(NotFoundException::book));
         }
 
         BookCatalogProvider provider = providers.stream()
                 .filter(p -> p.providerName().equalsIgnoreCase(providerName) && p.enabled())
-                .findFirst().orElseThrow(() -> new BadRequestException("Catalog provider is not available"));
-        CatalogBook source = provider.get(externalId).orElseThrow(() -> new NotFoundException("External book not found"));
+                .findFirst().orElseThrow(() -> new BadRequestException("PROVIDER_UNAVAILABLE", "Catalog provider is not available"));
+        CatalogBook source = provider.get(externalId)
+                .orElseThrow(() -> new NotFoundException("EXTERNAL_BOOK_NOT_FOUND", "External book not found"));
 
-        Book book = findExisting(source).orElseGet(() -> books.save(new Book(
-                cleanIsbn(source.isbn13(), 13), cleanIsbn(source.isbn10(), 10), source.title(), source.subtitle(),
+        Optional<Book> existing = findExisting(source);
+        Book book = existing.orElseGet(() -> books.save(new Book(
+                BookFingerprint.isbn13(source.isbn13()), BookFingerprint.isbn10(source.isbn10()), source.title(), source.subtitle(),
                 BookMapper.join(source.authors()), BookMapper.join(source.categories()), source.description(), source.language(),
                 source.publisher(), source.publishedYear(), source.pageCount(), source.coverUrl(), source.publicDomain()
         )));
 
-        refs.save(new ExternalBookReference(book.getId(), source.provider(), source.externalId(), source.sourceUrl()));
-        vectorIndexer.index(book);
+        refs.findByProviderAndExternalId(source.provider(), source.externalId())
+                .orElseGet(() -> refs.save(new ExternalBookReference(book.getId(), source.provider(), source.externalId(), source.sourceUrl())));
+        if (existing.isEmpty()) vectorIndexer.index(book);
         return BookMapper.toView(book);
     }
 
-    private Optional<Book> findExisting(CatalogBook source) {
-        String isbn = cleanIsbn(source.isbn13(), 13);
-        if (isbn != null) {
-            Optional<Book> byIsbn = books.findByIsbn13(isbn);
+    Optional<Book> findExisting(CatalogBook source) {
+        String isbn13 = BookFingerprint.isbn13(source.isbn13());
+        if (isbn13 == null) isbn13 = BookFingerprint.isbn10To13(source.isbn10());
+        if (isbn13 != null) {
+            Optional<Book> byIsbn = books.findByIsbn13(isbn13);
             if (byIsbn.isPresent()) return byIsbn;
         }
-        String author = source.authors() == null || source.authors().isEmpty() ? "" : source.authors().getFirst();
-        return books.findFingerprint(source.title(), author);
-    }
-
-    private String cleanIsbn(String value, int length) {
-        if (value == null) return null;
-        String cleaned = value.replaceAll("[^0-9Xx]", "");
-        return cleaned.length() == length ? cleaned : null;
-    }
-
-    private String fingerprint(CatalogBook book) {
-        if (book.isbn13() != null) return "isbn13:" + book.isbn13().replaceAll("[^0-9]", "");
-        if (book.isbn10() != null) return "isbn10:" + book.isbn10().replaceAll("[^0-9Xx]", "");
-        String author = book.authors() == null || book.authors().isEmpty() ? "" : book.authors().getFirst();
-        return normalize(book.title()) + "::" + normalize(author);
-    }
-
-    private String normalize(String value) {
-        if (value == null) return "";
-        return Normalizer.normalize(value, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", " ")
-                .trim();
+        String isbn10 = BookFingerprint.isbn10(source.isbn10());
+        if (isbn10 != null) {
+            Optional<Book> byIsbn10 = books.findByIsbn10(isbn10).stream().findFirst();
+            if (byIsbn10.isPresent()) return byIsbn10;
+        }
+        if (source.title() == null) return Optional.empty();
+        String wanted = BookFingerprint.of(null, null, source.title(), source.authors());
+        return books.findTop20ByTitleIgnoreCase(source.title().trim()).stream()
+                .filter(b -> BookFingerprint.of(null, null, b.getTitle(), BookMapper.toView(b).authors()).equals(wanted))
+                .findFirst();
     }
 }

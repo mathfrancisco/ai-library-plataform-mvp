@@ -8,11 +8,13 @@ import java.util.Map;
 public class AiPromptTemplates {
     private static final PromptTemplate GROUNDED_QA = PromptTemplate.builder()
             .template("""
-                    QUESTION:
+                    <question>
                     {question}
+                    </question>
 
-                    CONTEXT:
+                    <context>
                     {context}
+                    </context>
                     """)
             .build();
 

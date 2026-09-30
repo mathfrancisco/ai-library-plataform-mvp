@@ -12,6 +12,10 @@ import java.util.UUID;
 public interface BookRepository extends JpaRepository<Book, UUID> {
     Optional<Book> findByIsbn13(String isbn13);
 
+    List<Book> findByIsbn10(String isbn10);
+
+    List<Book> findTop20ByTitleIgnoreCase(String title);
+
     @Query(value = """
             SELECT b.*
             FROM books b
@@ -20,12 +24,4 @@ public interface BookRepository extends JpaRepository<Book, UUID> {
             LIMIT :limit
             """, nativeQuery = true)
     List<Book> lexicalSearch(@Param("query") String query, @Param("limit") int limit);
-
-    @Query(value = """
-            SELECT * FROM books
-            WHERE lower(title) = lower(:title)
-              AND (:author = '' OR lower(coalesce(author_names,'')) LIKE lower(concat('%', :author, '%')))
-            LIMIT 1
-            """, nativeQuery = true)
-    Optional<Book> findFingerprint(@Param("title") String title, @Param("author") String author);
 }

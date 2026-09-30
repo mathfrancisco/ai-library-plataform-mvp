@@ -2,5 +2,11 @@ package com.ailibrary.common.security;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.List;
+
 @ConfigurationProperties(prefix = "app.auth")
-public record AuthProperties(String jwtSecret, long accessTtlMinutes, long refreshTtlDays) {}
+public record AuthProperties(String jwtSecret, long accessTtlMinutes, long refreshTtlDays, List<String> corsAllowedOrigins) {
+    public AuthProperties {
+        if (corsAllowedOrigins == null || corsAllowedOrigins.isEmpty()) corsAllowedOrigins = List.of("http://localhost:3000");
+    }
+}

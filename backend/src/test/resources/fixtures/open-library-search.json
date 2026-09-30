@@ -1,0 +1,23 @@
+{
+  "numFound": 2,
+  "docs": [
+    {
+      "key": "/works/OL17618370W",
+      "title": "Clean Architecture",
+      "subtitle": "A Craftsman's Guide to Software Structure and Design",
+      "author_name": ["Robert C. Martin"],
+      "isbn": ["0134494164", "9780134494166"],
+      "first_publish_year": 2017,
+      "cover_i": 8290435,
+      "language": ["eng"],
+      "publisher": ["Prentice Hall"],
+      "subject": ["Software architecture", "Computer software"],
+      "number_of_pages_median": 404
+    },
+    {
+      "key": "/works/OL1W",
+      "title": "Untitled pamphlet",
+      "public_scan_b": true
+    }
+  ]
+}

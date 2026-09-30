@@ -74,7 +74,7 @@ public class AiFacade {
     public AiProperties properties() { return properties; }
 
     private void ensureEnabled() {
-        if (!properties.enabled()) throw new BadRequestException("AI features are disabled");
+        if (!properties.enabled()) throw new BadRequestException("AI_DISABLED", "AI features are disabled; set AI_ENABLED=true and configure a provider");
     }
 
     private void saveLog(UUID userId, String operation, long started, ChatResponse response, RuntimeException error) {

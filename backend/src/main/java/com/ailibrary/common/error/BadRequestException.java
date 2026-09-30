@@ -1,7 +1,13 @@
 package com.ailibrary.common.error;
 
-public class BadRequestException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class BadRequestException extends ApiException {
     public BadRequestException(String message) {
-        super(message);
+        this("BAD_REQUEST", message);
+    }
+
+    public BadRequestException(String code, String message) {
+        super(HttpStatus.BAD_REQUEST, code, message);
     }
 }

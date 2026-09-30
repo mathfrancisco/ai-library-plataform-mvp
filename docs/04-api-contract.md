@@ -28,10 +28,14 @@ Base path: `/api`
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/search?q=&mode=HYBRID` | Hybrid local semantic + FTS + external search |
-| POST | `/search/discover` | Natural-language discovery request |
+| GET | `/search?q=&mode=HYBRID&limit=20` | Hybrid local semantic + FTS + external search |
+| POST | `/search/discover` | Natural-language discovery request (`{"prompt": "..."}`) |
 
-Modes: `LEXICAL`, `SEMANTIC`, `HYBRID`.
+Modes: `LEXICAL` (local FTS + external), `SEMANTIC` (local vectors only), `HYBRID` (all three).
+
+Each `SearchHit` carries `matchType` (`LEXICAL`, `SEMANTIC`, `EXTERNAL`, or `HYBRID` when several sources agreed) and
+`matchedBy` (the contributing sources). Local and external copies of the same book are merged by ISBN-13 → ISBN-10 →
+normalized title + first author, keeping the local `localBookId`.
 
 ## Personal library
 
@@ -70,10 +74,22 @@ Modes: `LEXICAL`, `SEMANTIC`, `HYBRID`.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/recommendations` | Rule + similarity recommendations |
-| GET | `/dashboard` | Reading counts/progress summary |
+| GET | `/recommendations?limit=12` | Rule + similarity recommendations: `[{book, score, reasons[]}]` |
+| GET | `/dashboard` | Status counts, favorites, pages, progress on current reads, average rating, completed this year, currently reading |
+
+Recommendations exclude every book already on the user's shelf (and other editions of it). Reasons are human-readable,
+for example `More from Frank Herbert` or `Matches your interest in Science fiction`.
+
+## Library ↔ reading progress
+
+- Moving a book to `READING` sets `startedAt` (if empty).
+- Moving a book to `READ` sets `completedAt` (if empty), `percentage = 100` and `currentPage = pageCount` when known.
+- `PUT /reading/{bookId}` derives `percentage` from `currentPage` when the book has a page count, rejects pages beyond
+  the page count and `completedAt` before `startedAt`.
 
 ## Error envelope
+
+Every error — including 401/403 from the security layer — uses the same shape:
 
 ```json
 {
@@ -83,3 +99,14 @@ Modes: `LEXICAL`, `SEMANTIC`, `HYBRID`.
   "path": "/api/books/..."
 }
 ```
+
+| HTTP | Codes |
+|---|---|
+| 400 | `VALIDATION_ERROR`, `MALFORMED_REQUEST`, `AI_DISABLED`, `DOCUMENT_NOT_READY`, `NO_BOOK_DOCUMENTS`, `NO_SUMMARY_SOURCE`, `UNSUPPORTED_FILE_TYPE`, `EMPTY_FILE`, `FILE_TOO_LARGE`, `PROVIDER_UNAVAILABLE` |
+| 401 | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN` |
+| 403 | `FORBIDDEN` |
+| 404 | `BOOK_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `LIBRARY_ITEM_NOT_FOUND`, `READING_PROGRESS_NOT_FOUND`, `EXTERNAL_BOOK_NOT_FOUND`, `USER_NOT_FOUND`, `NOT_FOUND` |
+| 409 | `EMAIL_ALREADY_REGISTERED`, `BOOK_ALREADY_EXISTS` |
+| 413 | `FILE_TOO_LARGE` (multipart limit) |
+| 429 | `RATE_LIMITED` |
+| 500 | `INTERNAL_ERROR` |

@@ -1,6 +1,8 @@
 package com.ailibrary.library.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -24,10 +26,11 @@ public class UserLibraryItem {
     @Column(nullable = false)
     private boolean favorite;
 
+    @JdbcTypeCode(SqlTypes.SMALLINT)
     private Integer rating;
 
-    @Column(name = "added_at", nullable = false, insertable = false, updatable = false)
-    private Instant addedAt;
+    @Column(name = "added_at", nullable = false, updatable = false)
+    private Instant addedAt = Instant.now();
 
     protected UserLibraryItem() {}
 
