@@ -20,7 +20,7 @@
     <properties>
         <java.version>21</java.version>
         <spring-ai.version>2.0.1</spring-ai.version>
-        <testcontainers.version>1.21.3</testcontainers.version>
+        <testcontainers.version>2.0.5</testcontainers.version>
         <!-- Tika 3.3 needs commons-compress 1.28; Testcontainers would otherwise pull 1.24 into the runtime classpath. -->
         <commons-compress.version>1.28.0</commons-compress.version>
     </properties>
