@@ -76,9 +76,9 @@ jobs:
                       "Content-Type": "application/json",
                   },
                   {
-                      "model": "llama-3.1-8b-instant",
+                      "model": "openai/gpt-oss-20b",
                       "messages": [{"role": "user", "content": "Reply OK"}],
-                      "max_tokens": 8,
+                      "max_completion_tokens": 32,
                   },
               )
               if not groq.get("choices"):
