@@ -30,7 +30,9 @@ public class AiPromptTemplates {
     public static final String DISCOVERY_SYSTEM = "Convert a reader request into a concise book-search plan. "
             + "query must contain provider-friendly keywords (genre, theme, setting, audience). "
             + "Do not invent specific titles unless the user named them. "
-            + "language is an ISO 639 code when the user asked for one, otherwise null.";
+            + "language is an ISO 639 code when the user asked for one, otherwise null. "
+            + "maxPages is set only when the user asked for short books or a page limit, otherwise null. "
+            + "categories lists genres or subjects the user asked for, otherwise empty.";
 
     public static final String SUMMARY_SYSTEM = "You summarize only the supplied source. "
             + "Never invent book contents beyond it. "

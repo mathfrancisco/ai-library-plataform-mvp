@@ -110,6 +110,10 @@ as degraded instead of failing the search:
 
 Weighted reciprocal-rank fusion (external results weighted 0.8) is used instead of a hand-trained ranking model. This is explainable, cheap and appropriate for a single-developer project.
 
+Natural-language discovery turns the request into a typed `DiscoveryPlan` (`query`, `language`, `categories`,
+`maxPages`). The query drives the hybrid search above; language, categories and page limit are applied as
+post-filters on all three branches, and a hit with missing data is kept rather than dropped.
+
 ## Tool calling
 
 Spring AI 2.0's `ChatClient` tool-calling advisor executes application-defined tools. Tools in MVP:
@@ -133,8 +137,8 @@ Book summaries are cached in `ai_generations`. The key (`BookSummaryService.cach
 `BOOK_SUMMARY | bookId | sha256(whitespace-normalized source text) | model | prompt version | summary type`
 
 There is no stored source version: the hash of the source text plays that role, so editing the description,
-changing the model, or changing the prompt (bump `PROMPT_VERSION`) produces a new key. Summary types are `SHORT`
-and `TLDR`.
+changing the model, or changing the prompt (bump `PROMPT_VERSION`) produces a new key. Summary types are `TLDR`,
+`SHORT` and `TAKEAWAYS`.
 
 ## Spring AI feature map in this repository
 

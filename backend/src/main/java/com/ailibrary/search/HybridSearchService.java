@@ -78,8 +78,8 @@ public class HybridSearchService {
     }
 
     /** Filters from a discovery plan; null fields do not filter. */
-    public record Filters(String language, List<String> categories) {
-        static final Filters NONE = new Filters(null, List.of());
+    public record Filters(String language, List<String> categories, Integer maxPages) {
+        static final Filters NONE = new Filters(null, List.of(), null);
     }
 
     public SearchResponse search(String query, SearchMode mode, int limit) {
@@ -102,13 +102,13 @@ public class HybridSearchService {
 
         List<SearchHit> hits = fuse(
                 lexicalHits.stream()
-                        .filter(b -> matches(filters, b.getLanguage(), b.getCategoryNames()))
+                        .filter(b -> matches(filters, b.getLanguage(), b.getCategoryNames(), b.getPageCount()))
                         .toList(),
                 semanticHits.stream()
-                        .filter(b -> matches(filters, b.getLanguage(), b.getCategoryNames()))
+                        .filter(b -> matches(filters, b.getLanguage(), b.getCategoryNames(), b.getPageCount()))
                         .toList(),
                 page.items().stream()
-                        .filter(b -> matches(filters, b.language(), String.join("|", b.categories())))
+                        .filter(b -> matches(filters, b.language(), String.join("|", b.categories()), b.pageCount()))
                         .toList(),
                 limit);
         return new SearchResponse(hits, List.copyOf(degraded), page.providers());
@@ -135,10 +135,14 @@ public class HybridSearchService {
     }
 
     /**
-     * Language compares ISO 639 codes in 2- or 3-letter form; categories need one overlapping term. Hits with no
-     * language or categories are kept: missing data never filters a book out.
+     * Language compares ISO 639 codes in 2- or 3-letter form; categories need one overlapping term; page count must
+     * not exceed {@code maxPages}. Hits with no language, categories or page count are kept: missing data never
+     * filters a book out.
      */
-    static boolean matches(Filters filters, String language, String categories) {
+    static boolean matches(Filters filters, String language, String categories, Integer pageCount) {
+        if (filters.maxPages() != null && filters.maxPages() > 0 && pageCount != null) {
+            if (pageCount > filters.maxPages()) return false;
+        }
         if (filters.language() != null
                 && language != null
                 && !filters.language().isBlank()) {
@@ -191,7 +195,8 @@ public class HybridSearchService {
                 query,
                 SearchMode.HYBRID,
                 limit,
-                new Filters(plan.language(), plan.categories() == null ? List.of() : plan.categories()));
+                new Filters(
+                        plan.language(), plan.categories() == null ? List.of() : plan.categories(), plan.maxPages()));
         return new DiscoveryResponse(plan, found.results(), found.degraded(), found.providers());
     }
 

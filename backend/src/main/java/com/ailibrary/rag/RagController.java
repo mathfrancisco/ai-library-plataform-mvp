@@ -20,7 +20,7 @@ public class RagController {
         this.currentUser = currentUser;
     }
 
-    public record AskRequest(@NotBlank @Size(max = 2000) String question) {}
+    public record AskRequest(@NotBlank @Size(max = 1000) String question) {}
 
     @PostMapping("/documents/{id}/chat")
     public RagAnswer chatDocument(@PathVariable UUID id, @Valid @RequestBody AskRequest request) {

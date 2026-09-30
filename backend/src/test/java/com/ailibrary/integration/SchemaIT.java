@@ -46,4 +46,19 @@ class SchemaIT extends PostgresIntegrationTest {
                 Integer.class);
         assertThat(hits).isGreaterThanOrEqualTo(1);
     }
+
+    /** Tenant-filtered HNSW search relies on iterative index scans (pgvector 0.8+, SPEC-04 §12.1). */
+    @Test
+    void pgvectorSupportsIterativeScanAndConnectionsUseIt() {
+        String version =
+                jdbc.queryForObject("select extversion from pg_extension where extname = 'vector'", String.class);
+        String[] parts = version.split("\\.");
+        int major = Integer.parseInt(parts[0]);
+        int minor = Integer.parseInt(parts[1]);
+        assertThat(major > 0 || minor >= 8)
+                .as("pgvector %s must be >= 0.8.0", version)
+                .isTrue();
+        assertThat(jdbc.queryForObject("show hnsw.iterative_scan", String.class))
+                .isEqualTo("relaxed_order");
+    }
 }

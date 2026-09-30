@@ -16,7 +16,7 @@ Groq; everything else works without an AI key.
 | PDF/EPUB/TXT/MD ingestion | ✅ | | | `document` | done |
 | Owner-isolated document vectors | ✅ | | | `document` + `rag` | done |
 | Single-document grounded RAG | ✅ | | | `rag` | done (needs `AI_ENABLED`); book chat over a book's documents too |
-| AI catalog-description summaries + cache | ✅ | | | `ai` | done (`SHORT`, `TLDR`) |
+| AI catalog-description summaries + cache | ✅ | | | `ai` | done (`TLDR`, `SHORT`, `TAKEAWAYS`) |
 | Library assistant with Tool Calling | ✅ | | | `ai` | done (5 tools incl. `findLocalBooks`) |
 | Rule/vector recommendations | ✅ | | | `recommendation` | done |
 | AI request telemetry | ✅ | | | `ai_request_logs` | done (`ai_request_logs`; per-user usage at `GET /api/ai/usage`) |

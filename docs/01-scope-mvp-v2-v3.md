@@ -5,7 +5,7 @@
 Every MVP item below is implemented (status per feature in [09-feature-matrix.md](09-feature-matrix.md)).
 Items that changed or moved while implementing [`docs/specs`](specs/README.md):
 
-- **Full summary type removed.** Summaries are `SHORT` and `TLDR`; a "full" summary from a catalog description
+- **Full summary type removed.** Summaries are `TLDR`, `SHORT` and `TAKEAWAYS`; a "full" summary from a catalog description
   added nothing (SPEC-04 §10.7).
 - **Chat provider is Groq, embeddings are local ONNX** (ADR-004). Search, recommendations and document
   ingestion work without an AI key.
@@ -47,7 +47,7 @@ Items that changed or moved while implementing [`docs/specs`](specs/README.md):
 - Per-user quotas (50 documents, 500 MB).
 
 ### AI
-- Summary generation (`SHORT`, `TLDR`) with prompt-hash cache.
+- Summary generation (`TLDR`, `SHORT`, `TAKEAWAYS`) with prompt-hash cache.
 - Natural-language discovery/query rewriting.
 - Spring AI ChatClient on Groq with `FAST`/`SMART` model tiers, per-user and global rate limits.
 - Tool calling for read-only personal-library actions plus safe write action to add an existing local book.
