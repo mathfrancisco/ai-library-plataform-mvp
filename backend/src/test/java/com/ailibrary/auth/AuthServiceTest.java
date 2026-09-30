@@ -31,7 +31,7 @@ import static org.mockito.Mockito.*;
 class AuthServiceTest {
     private final UserRepository users = mock(UserRepository.class);
     private final RefreshTokenRepository tokens = mock(RefreshTokenRepository.class);
-    private final AuthProperties props = new AuthProperties("0123456789abcdef0123456789abcdef", 15, 30, null);
+    private final AuthProperties props = new AuthProperties("0123456789abcdef0123456789abcdef", 15, 30, null, null);
     private final Map<String, RefreshToken> stored = new HashMap<>();
     private AuthService service;
 

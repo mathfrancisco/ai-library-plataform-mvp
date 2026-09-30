@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtServiceTest {
     @Test void roundTripsClaims() {
-        var props = new AuthProperties("0123456789abcdef0123456789abcdef", 15, 30, null);
+        var props = new AuthProperties("0123456789abcdef0123456789abcdef", 15, 30, null, null);
         var jwt = new JwtService(props);
         var user = new User("dev@example.com", "hash", "Dev");
         String token = jwt.issueAccessToken(user);

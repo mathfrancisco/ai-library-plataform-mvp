@@ -26,6 +26,7 @@ Document chat further adds `documentId == requestedDocumentId`. The service also
 MVP controls:
 
 - allow-list extensions: PDF, EPUB, TXT, MD/Markdown;
+- declared Content-Type must match the extension, and the actual bytes are sniffed with Tika (a `.pdf` containing HTML is rejected);
 - max size configured by Spring multipart settings and app property;
 - generated storage key instead of trusting original filename;
 - normalized path check to prevent path traversal;
@@ -50,7 +51,9 @@ MVP enforces an in-memory per-user fixed-window limit of 30 AI operations/minute
 ## CORS and operational endpoints
 
 - Allowed browser origins come from `CORS_ALLOWED_ORIGINS` (comma-separated; default `http://localhost:3000`).
-- `/actuator/health` and `/actuator/info` are public; every other actuator endpoint requires the `ADMIN` role.
+- `/actuator/health` and `/actuator/info` are public; every other actuator endpoint and `/api/admin/**` require the `ADMIN` role.
+- `APP_ADMIN_EMAILS` is the only way to grant `ADMIN`; there is no self-service role change.
+- Expired refresh tokens, and revoked ones older than 7 days, are purged daily.
 - 401/403 responses from the security layer use the standard error envelope.
 
 ## Vector operations when AI is disabled

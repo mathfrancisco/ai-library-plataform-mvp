@@ -59,6 +59,27 @@ class DocumentServiceTest {
     }
 
     @Test
+    void rejectsFilesWhoseContentDoesNotMatchTheExtension() {
+        UUID owner = UUID.randomUUID();
+        // Declared type and extension both claim PDF, but the bytes are HTML.
+        assertThatThrownBy(() -> service().upload(owner, null,
+                new MockMultipartFile("file", "paper.pdf", "application/pdf", "<html><script>x</script></html>".getBytes())))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("does not match its extension");
+        assertThatThrownBy(() -> service().upload(owner, null,
+                new MockMultipartFile("file", "notes.txt", "text/plain", new byte[]{0x50, 0x4B, 0x03, 0x04, 0, 0, 0, 0})))
+                .isInstanceOf(BadRequestException.class);
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void acceptsRealPdfBytes() {
+        when(docs.save(any())).thenAnswer(i -> i.getArgument(0));
+        var view = service().upload(UUID.randomUUID(), null,
+                new MockMultipartFile("file", "paper.pdf", "application/pdf", "%PDF-1.7\n%âãÏÓ\n1 0 obj<<>>endobj\n".getBytes()));
+        assertThat(view.originalName()).isEqualTo("paper.pdf");
+    }
+
+    @Test
     void anotherUsersDocumentIsNotFound() {
         UUID owner = UUID.randomUUID(), id = UUID.randomUUID();
         when(docs.findByIdAndOwnerId(id, owner)).thenReturn(Optional.empty());

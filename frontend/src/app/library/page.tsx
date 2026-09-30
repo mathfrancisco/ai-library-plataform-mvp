@@ -12,7 +12,7 @@ export default function LibraryPage(){
   const remove=useMutation({mutationFn:(id:string)=>api(`/api/library/books/${id}`,{method:"DELETE"}),onSuccess:invalidate});
   if(!signedIn)return <main className="shell"><Empty title="Sign in to see your shelf" body="Your library is private to your account."/><p style={{textAlign:"center"}}><Link className="btn" href="/login">Sign in</Link></p></main>;
   return <main className="shell">
-    <div className="sectionhead"><div><p className="eyebrow">Personal library</p><h1>My shelf</h1></div><select aria-label="Filter by status" className="select" style={{maxWidth:180}} value={status} onChange={e=>setStatus(e.target.value as LibraryStatus|"")}><option value="">All books</option>{LIBRARY_STATUSES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</select></div>
+    <div className="sectionhead"><div><p className="eyebrow">Personal library</p><h1>My shelf</h1></div><div className="row"><Link className="btn secondary" href="/books/new">+ Add manually</Link><select aria-label="Filter by status" className="select" style={{maxWidth:180}} value={status} onChange={e=>setStatus(e.target.value as LibraryStatus|"")}><option value="">All books</option>{LIBRARY_STATUSES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</select></div></div>
     <ErrorNote error={q.error??update.error??remove.error}/>
     {!q.isLoading&&!q.data?.length?<Empty title="Your shelf is empty" body="Search the catalog and add a book to begin."/>:<div className="grid">{q.data?.map(x=>{const id=x.book.id!;const busy=update.isPending&&update.variables?.id===id;return <div key={id}><BookCard book={x.book}/>
       <div style={{padding:"10px 4px",display:"grid",gap:8}}>

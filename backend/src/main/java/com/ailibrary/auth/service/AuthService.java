@@ -47,7 +47,9 @@ public class AuthService {
         if (users.existsByEmailIgnoreCase(email)) {
             throw new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "Email already registered");
         }
-        User user = users.save(new User(email, passwordEncoder.encode(request.password()), request.displayName().trim()));
+        User user = new User(email, passwordEncoder.encode(request.password()), request.displayName().trim());
+        if (properties.adminEmails().contains(email)) user.promoteToAdmin();
+        user = users.save(user);
         return issuePair(user);
     }
 

@@ -37,6 +37,8 @@ public class User {
         this.role = Role.USER;
     }
 
+    public void promoteToAdmin() { this.role = Role.ADMIN; }
+
     public UUID getId() { return id; }
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }

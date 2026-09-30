@@ -2,6 +2,7 @@
 import {useState} from "react";
 import {useMutation,useQuery} from "@tanstack/react-query";
 import {useRouter} from "next/navigation";
+import Link from "next/link";
 import {api} from "@/lib/api";
 import {useSignedIn} from "@/lib/auth";
 import {ErrorNote} from "@/components/ErrorNote";
@@ -18,7 +19,7 @@ export default function Explore(){
   const key=(h:SearchHit)=>`${h.provider}-${h.externalId}-${h.localBookId}`;
   const results=discovered?.results??search.data??[];
   return <main className="shell">
-    <div className="sectionhead"><div><p className="eyebrow">Hybrid discovery</p><h1>Explore books</h1></div><span className="badge">FTS + vector + federated catalog</span></div>
+    <div className="sectionhead"><div><p className="eyebrow">Hybrid discovery</p><h1>Explore books</h1></div><div className="row"><span className="badge">FTS + vector + federated catalog</span>{signedIn&&<Link className="btn secondary" href="/books/new">+ Add manually</Link>}</div></div>
     <form className="searchbox" onSubmit={e=>{e.preventDefault();setDiscovered(undefined);setSubmitted(q)}}><input className="input" value={q} onChange={e=>setQ(e.target.value)} placeholder="Title, author, ISBN or keywords"/><select className="select" style={{maxWidth:150}} value={mode} onChange={e=>setMode(e.target.value)}><option>HYBRID</option><option>LEXICAL</option><option>SEMANTIC</option></select><button className="btn">Search</button></form>
     <div className="panel" style={{marginBottom:28}}><p className="eyebrow">Discover with natural language</p><div className="searchbox" style={{marginBottom:0}}><input className="input" value={prompt} onChange={e=>setPrompt(e.target.value)} /><button className="btn secondary" onClick={()=>discover.mutate()} disabled={discover.isPending||!signedIn} title={signedIn?undefined:"Sign in to use AI discovery"}>{discover.isPending?"Understanding…":"Discover with AI"}</button></div>{discovered&&<p className="muted">Interpreted as: <b>{discovered.plan.query}</b>{discovered.plan.categories?.length?` · ${discovered.plan.categories.join(", ")}`:""}</p>}</div>
     <ErrorNote error={search.error??discover.error??add.error??open.error}/>

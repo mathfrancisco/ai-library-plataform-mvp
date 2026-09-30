@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** HTTP-level checks for auth boundaries, owner isolation and the error envelope. */
 @EnabledIf(PostgresIntegrationTest.DATABASE_AVAILABLE)
 class ApiIntegrationTest extends PostgresIntegrationTest {
+    static final String ADMIN_EMAIL = "admin-it@example.com";
     private static final ObjectMapper JSON = JsonMapper.builder().build();
     private final HttpClient http = HttpClient.newHttpClient();
 
@@ -66,6 +67,21 @@ class ApiIntegrationTest extends PostgresIntegrationTest {
         assertThat(invalid.body().path("code").asString()).isEqualTo("VALIDATION_ERROR");
         Res aiOff = call("POST", "/api/ai/assistant", token, "{\"message\":\"hi\"}");
         assertThat(aiOff.body().path("code").asString()).isEqualTo("AI_DISABLED");
+    }
+
+    @Test
+    void adminEndpointsRequireAdminRoleAndConfiguredAdminsArePromoted() throws Exception {
+        String user = register("plain");
+        Res forbidden = call("POST", "/api/admin/books/reindex", user, null);
+        assertThat(forbidden.status()).isEqualTo(403);
+        assertThat(forbidden.body().path("code").asString()).isEqualTo("FORBIDDEN");
+
+        call("POST", "/api/auth/register", null, "{\"email\":\"" + ADMIN_EMAIL + "\",\"password\":\"password1\",\"displayName\":\"Admin\"}");
+        Res login = call("POST", "/api/auth/login", null, "{\"email\":\"" + ADMIN_EMAIL + "\",\"password\":\"password1\"}");
+        assertThat(login.body().path("user").path("role").asString()).isEqualTo("ADMIN");
+        Res reindex = call("POST", "/api/admin/books/reindex", login.body().path("accessToken").asString(), null);
+        // AI is disabled in tests, so the admin gets past authorization and hits the AI guard.
+        assertThat(reindex.body().path("code").asString()).isEqualTo("AI_DISABLED");
     }
 
     private String register(String name) throws Exception {

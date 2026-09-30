@@ -87,6 +87,14 @@ for example `More from Frank Herbert` or `Matches your interest in Science ficti
 - `PUT /reading/{bookId}` derives `percentage` from `currentPage` when the book has a page count, rejects pages beyond
   the page count and `completedAt` before `startedAt`.
 
+## Admin
+
+Requires the `ADMIN` role. Accounts listed in `APP_ADMIN_EMAILS` are promoted on registration and at startup.
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/admin/books/reindex` | Re-embed every local book (after enabling AI or changing the embedding model) |
+
 ## Error envelope
 
 Every error — including 401/403 from the security layer — uses the same shape:

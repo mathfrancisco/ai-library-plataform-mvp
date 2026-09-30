@@ -7,4 +7,5 @@ public interface UserDocumentRepository extends JpaRepository<UserDocument,UUID>
     List<UserDocument> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
     Optional<UserDocument> findByIdAndOwnerId(UUID id,UUID ownerId);
     List<UserDocument> findByOwnerIdAndBookIdAndStatus(UUID ownerId,UUID bookId,DocumentStatus status);
+    List<UserDocument> findByStatusIn(Collection<DocumentStatus> statuses);
 }
