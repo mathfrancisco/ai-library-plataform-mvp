@@ -3,12 +3,15 @@ package com.ailibrary.document;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.error.BadRequestException;
 import com.ailibrary.common.error.NotFoundException;
 import com.ailibrary.document.repository.UserDocumentRepository;
+import com.ailibrary.library.service.LibraryService;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -27,9 +30,11 @@ class DocumentServiceTest {
     private final BookRepository books = mock(BookRepository.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    private final LibraryService library = mock(LibraryService.class);
 
     private DocumentService service() {
-        return new DocumentService(docs, books, new UploadProperties(dir.toString(), 1024), events, jdbc);
+        return new DocumentService(
+                docs, books, new UploadProperties(dir.toString(), 1024, 2, 3000L, null), events, jdbc, library);
     }
 
     @Test
@@ -127,5 +132,34 @@ class DocumentServiceTest {
         assertThat(DocumentService.displayName("C:\\Users\\me\\book.pdf")).isEqualTo("book.pdf");
         assertThat(DocumentService.displayName("a\u0000b.txt")).isEqualTo("ab.txt");
         assertThat(DocumentService.displayName(null)).isEqualTo("upload");
+    }
+
+    @Test
+    void enforcesPerUserQuota() {
+        UUID owner = UUID.randomUUID();
+        when(docs.countByOwnerId(owner)).thenReturn(2L);
+        assertThatThrownBy(() -> service()
+                        .upload(owner, null, new MockMultipartFile("file", "a.txt", "text/plain", "hi".getBytes())))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("limit");
+        when(docs.countByOwnerId(owner)).thenReturn(0L);
+        when(docs.sumSizeByOwnerId(owner)).thenReturn(2999L);
+        assertThatThrownBy(() -> service()
+                        .upload(owner, null, new MockMultipartFile("file", "a.txt", "text/plain", "hi".getBytes())))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Storage");
+    }
+
+    @Test
+    void uploadForABookPutsItOnTheShelfAsReading() {
+        when(docs.save(any())).thenAnswer(i -> i.getArgument(0));
+        UUID owner = UUID.randomUUID(), book = UUID.randomUUID();
+        when(books.existsById(book)).thenReturn(true);
+        service().upload(owner, book, new MockMultipartFile("file", "a.md", "text/markdown", "# hi".getBytes()));
+        verify(library)
+                .add(
+                        eq(owner),
+                        eq(book),
+                        argThat(r -> r.status() == com.ailibrary.library.domain.LibraryStatus.READING));
     }
 }

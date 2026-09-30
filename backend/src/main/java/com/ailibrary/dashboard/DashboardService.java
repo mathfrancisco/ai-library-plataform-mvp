@@ -8,6 +8,7 @@ import com.ailibrary.library.repository.UserLibraryRepository;
 import com.ailibrary.reading.domain.ReadingProgress;
 import com.ailibrary.reading.repository.ReadingProgressRepository;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Function;
@@ -18,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DashboardService {
+    static final int RECENT_ACTIVITY = 5;
+
     private final UserLibraryRepository library;
     private final ReadingProgressRepository progress;
     private final BookRepository books;
@@ -50,12 +53,19 @@ public class DashboardService {
             double averageProgress,
             Double averageRating,
             long completedThisYear,
-            List<CurrentlyReading> currentlyReading) {}
+            List<CurrentlyReading> currentlyReading,
+            List<RecentActivity> recentActivity) {}
+
+    public record RecentActivity(
+            UUID bookId, String title, LibraryStatus status, double percentage, Instant updatedAt) {}
 
     @Transactional(readOnly = true)
     public Dashboard get(UUID userId) {
         List<UserLibraryItem> items = library.findByUserIdOrderByAddedAtDesc(userId);
+        Set<UUID> shelved = items.stream().map(UserLibraryItem::getBookId).collect(Collectors.toSet());
+        // Only progress for books still on the shelf counts (SPEC-04 §12.9d).
         Map<UUID, ReadingProgress> progressByBook = progress.findByUserId(userId).stream()
+                .filter(p -> shelved.contains(p.getBookId()))
                 .collect(Collectors.toMap(ReadingProgress::getBookId, Function.identity(), (a, b) -> a));
         Map<LibraryStatus, Long> byStatus = items.stream()
                 .collect(Collectors.groupingBy(
@@ -77,8 +87,15 @@ public class DashboardService {
                 .filter(i -> i.getStatus() == LibraryStatus.READING)
                 .map(UserLibraryItem::getBookId)
                 .toList();
+        List<UserLibraryItem> recentItems = items.stream()
+                .sorted(Comparator.comparing((UserLibraryItem i) -> lastActivity(i, progressByBook.get(i.getBookId())))
+                        .reversed())
+                .limit(RECENT_ACTIVITY)
+                .toList();
+        Set<UUID> needed = new HashSet<>(readingIds);
+        recentItems.forEach(i -> needed.add(i.getBookId()));
         Map<UUID, Book> readingBooks = new HashMap<>();
-        books.findAllById(readingIds).forEach(b -> readingBooks.put(b.getId(), b));
+        books.findAllById(needed).forEach(b -> readingBooks.put(b.getId(), b));
         List<CurrentlyReading> current = readingIds.stream()
                 .map(readingBooks::get)
                 .filter(Objects::nonNull)
@@ -111,6 +128,26 @@ public class DashboardService {
                 averageProgress,
                 rating.isPresent() ? Math.round(rating.getAsDouble() * 10) / 10.0 : null,
                 completedThisYear,
-                current);
+                current,
+                recentItems.stream()
+                        .filter(i -> readingBooks.containsKey(i.getBookId()))
+                        .map(i -> {
+                            ReadingProgress p = progressByBook.get(i.getBookId());
+                            return new RecentActivity(
+                                    i.getBookId(),
+                                    readingBooks.get(i.getBookId()).getTitle(),
+                                    i.getStatus(),
+                                    p == null || p.getPercentage() == null
+                                            ? 0
+                                            : p.getPercentage().doubleValue(),
+                                    lastActivity(i, p));
+                        })
+                        .toList());
+    }
+
+    private static Instant lastActivity(UserLibraryItem item, ReadingProgress progress) {
+        Instant shelf = item.getUpdatedAt() == null ? item.getAddedAt() : item.getUpdatedAt();
+        if (progress == null || progress.getUpdatedAt() == null) return shelf;
+        return progress.getUpdatedAt().isAfter(shelf) ? progress.getUpdatedAt() : shelf;
     }
 }

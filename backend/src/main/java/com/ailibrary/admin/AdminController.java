@@ -22,6 +22,6 @@ public class AdminController {
 
     @PostMapping("/books/reindex")
     public ReindexResult reindexBooks() {
-        return new ReindexResult(indexer.reindexAll(books));
+        return new ReindexResult(indexer.reindexAll());
     }
 }

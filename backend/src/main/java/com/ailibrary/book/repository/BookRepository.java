@@ -13,7 +13,9 @@ public interface BookRepository extends JpaRepository<Book, UUID> {
 
     List<Book> findByIsbn10(String isbn10);
 
-    List<Book> findTop20ByTitleIgnoreCase(String title);
+    List<Book> findTop20ByTitleKey(String titleKey);
+
+    List<Book> findTop500ByTitleKeyIsNull();
 
     @Query(
             value =

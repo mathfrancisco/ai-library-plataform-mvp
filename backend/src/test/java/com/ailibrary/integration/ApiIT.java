@@ -2,29 +2,14 @@ package com.ailibrary.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 /** HTTP-level checks for auth boundaries, owner isolation and the error envelope. */
 @EnabledIf(PostgresIntegrationTest.DATABASE_AVAILABLE)
 class ApiIT extends PostgresIntegrationTest {
     static final String ADMIN_EMAIL = "admin-it@example.com";
-    private static final ObjectMapper JSON = JsonMapper.builder().build();
-    private final HttpClient http = HttpClient.newHttpClient();
-
-    @LocalServerPort
-    int port;
-
-    record Res(int status, JsonNode body) {}
 
     @Test
     void privateEndpointsRequireAuthenticationWithEnvelope() throws Exception {
@@ -43,7 +28,7 @@ class ApiIT extends PostgresIntegrationTest {
                 "/api/books",
                 alice,
                 "{\"title\":\"Isolation " + UUID.randomUUID() + "\",\"authorNames\":\"A\",\"pageCount\":200}");
-        assertThat(book.status()).isEqualTo(200);
+        assertThat(book.status()).isEqualTo(201);
         String bookId = book.body().path("id").asString();
 
         assertThat(call("POST", "/api/library/books/" + bookId, alice, "{\"status\":\"READING\",\"rating\":4}")
@@ -105,28 +90,5 @@ class ApiIT extends PostgresIntegrationTest {
                 null);
         assertThat(reindex.status()).isEqualTo(200);
         assertThat(reindex.body().path("indexed").asInt()).isGreaterThanOrEqualTo(1);
-    }
-
-    private String register(String name) throws Exception {
-        Res res = call(
-                "POST",
-                "/api/auth/register",
-                null,
-                "{\"email\":\"" + name + "-" + UUID.randomUUID()
-                        + "@example.com\",\"password\":\"password1\",\"displayName\":\"" + name + "\"}");
-        assertThat(res.status()).isEqualTo(201);
-        return res.body().path("accessToken").asString();
-    }
-
-    private Res call(String method, String path, String token, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
-                .method(
-                        method,
-                        body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
-        if (body != null) b.header("Content-Type", "application/json");
-        if (token != null) b.header("Authorization", "Bearer " + token);
-        HttpResponse<String> r = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
-        return new Res(
-                r.statusCode(), r.body() == null || r.body().isBlank() ? JSON.missingNode() : JSON.readTree(r.body()));
     }
 }

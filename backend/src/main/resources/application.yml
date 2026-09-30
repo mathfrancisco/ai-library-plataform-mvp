@@ -52,15 +52,25 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        # metrics/prometheus are opt-in (MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE) and require ROLE_ADMIN.
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info}
   endpoint:
     health:
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db
 
 server:
   error:
     include-message: never
+  tomcat:
+    # Read (and discard) bodies slightly over the 25 MB upload limit so clients get the 413 FILE_TOO_LARGE
+    # response instead of a reset connection.
+    max-swallow-size: 30MB
+  # Behind a reverse proxy, trust X-Forwarded-* so client IPs (rate limits) and URLs are correct.
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
 
 app:
   ai:
@@ -83,6 +93,26 @@ app:
   upload:
     dir: ${APP_UPLOAD_DIR:./uploads}
     max-bytes: 26214400
+    max-documents-per-user: ${APP_MAX_DOCUMENTS_PER_USER:50}
+    max-bytes-per-user: ${APP_MAX_BYTES_PER_USER:524288000}
+    max-extracted-chars: 2000000
+  # Similarity thresholds are cosine similarity for all-MiniLM-L6-v2.
+  search:
+    semantic-threshold: 0.30
+    lexical-timeout: PT2S
+    semantic-timeout: PT2S
+    external-timeout: PT3S
+  rag:
+    document-top-k: 6
+    book-top-k: 8
+    similarity-threshold: 0.30
+    max-context-tokens: 4000
+  recommendation:
+    similarity-threshold: 0.30
+  rate-limit:
+    auth-per-minute: 10
+    anonymous-search-per-minute: 30
+    user-search-per-minute: 120
   catalog:
     open-library:
       user-agent: "${OPEN_LIBRARY_USER_AGENT:AILibraryPortfolio/0.1 (contact: replace@example.com)}"

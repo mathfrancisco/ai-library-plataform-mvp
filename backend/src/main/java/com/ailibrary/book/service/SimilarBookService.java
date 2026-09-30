@@ -5,12 +5,16 @@ import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.vector.VectorFilters;
 import com.ailibrary.common.vector.VectorStoreAccess;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SimilarBookService {
+    private static final Logger log = LoggerFactory.getLogger(SimilarBookService.class);
+
     private final BookService bookService;
     private final BookRepository books;
     private final VectorStoreAccess vectors;
@@ -42,6 +46,7 @@ public class SimilarBookService {
             }
             return loadInOrder(ids);
         } catch (RuntimeException ex) {
+            log.warn("Similar books lookup failed for book {}: {}", id, ex.getMessage());
             return List.of();
         }
     }

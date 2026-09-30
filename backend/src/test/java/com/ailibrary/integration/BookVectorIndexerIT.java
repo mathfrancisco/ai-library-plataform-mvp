@@ -42,7 +42,7 @@ class BookVectorIndexerIT extends PostgresIntegrationTest {
                 369,
                 null,
                 false));
-        int indexed = indexer.reindexAll(books);
+        int indexed = indexer.reindexAll();
         assertThat(indexed).isGreaterThanOrEqualTo(1);
 
         List<Document> hits = vectors.store()

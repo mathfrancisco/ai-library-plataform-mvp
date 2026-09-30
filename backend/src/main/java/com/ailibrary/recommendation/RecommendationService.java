@@ -17,10 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Explainable recommendations without an ML pipeline:
@@ -38,7 +39,20 @@ public class RecommendationService {
     private final BookRepository books;
     private final VectorStoreAccess vectors;
 
+    private final double similarityThreshold;
+
     public RecommendationService(UserLibraryRepository library, BookRepository books, VectorStoreAccess vectors) {
+        this(library, books, vectors, 0.30);
+    }
+
+    /** Threshold tuned for all-MiniLM-L6-v2 cosine similarity (SPEC-04 §7.3). */
+    @Autowired
+    public RecommendationService(
+            UserLibraryRepository library,
+            BookRepository books,
+            VectorStoreAccess vectors,
+            @Value("${app.recommendation.similarity-threshold:0.30}") double similarityThreshold) {
+        this.similarityThreshold = similarityThreshold;
         this.library = library;
         this.books = books;
         this.vectors = vectors;
@@ -46,7 +60,7 @@ public class RecommendationService {
 
     public record Recommendation(BookView book, double score, List<String> reasons) {}
 
-    @Transactional(readOnly = true)
+    /** Not transactional: the vector search computes an embedding and must not hold a DB connection. */
     public List<Recommendation> forUser(UUID userId, int limit) {
         List<UserLibraryItem> items = library.findByUserIdOrderByAddedAtDesc(userId);
         if (items.isEmpty()) return coldStart(limit);
@@ -121,7 +135,7 @@ public class RecommendationService {
                     .similaritySearch(SearchRequest.builder()
                             .query(query)
                             .topK(Math.min(100, Math.max(20, limit * 3)))
-                            .similarityThreshold(.45)
+                            .similarityThreshold(similarityThreshold)
                             .filterExpression(VectorFilters.books())
                             .build());
             if (docs == null) return List.of();

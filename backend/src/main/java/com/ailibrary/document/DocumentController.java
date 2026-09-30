@@ -32,6 +32,11 @@ public class DocumentController {
         return service.view(service.owned(currentUser.id(), id));
     }
 
+    @PostMapping("/{id}/reingest")
+    public DocumentView reingest(@PathVariable UUID id) {
+        return service.reingest(currentUser.id(), id);
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id) {

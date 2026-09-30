@@ -104,15 +104,21 @@ public class UserDocument {
         errorMessage = null;
     }
 
+    public void queued() {
+        status = DocumentStatus.STORED;
+        errorMessage = null;
+        chunkCount = 0;
+    }
+
     public void ready(int count) {
         status = DocumentStatus.READY;
         chunkCount = count;
         errorMessage = null;
     }
 
-    public void failed(String message) {
+    /** Stores the failure code only (see IngestionFailure). */
+    public void failed(String reasonCode) {
         status = DocumentStatus.FAILED;
-        errorMessage =
-                message == null ? "Unknown ingestion error" : message.substring(0, Math.min(message.length(), 2000));
+        errorMessage = reasonCode;
     }
 }

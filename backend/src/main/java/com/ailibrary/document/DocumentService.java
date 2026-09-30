@@ -4,41 +4,54 @@ import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.error.BadRequestException;
 import com.ailibrary.common.error.ErrorCode;
 import com.ailibrary.common.error.NotFoundException;
+import com.ailibrary.document.domain.DocumentStatus;
 import com.ailibrary.document.domain.UserDocument;
 import com.ailibrary.document.repository.UserDocumentRepository;
+import com.ailibrary.library.domain.LibraryStatus;
+import com.ailibrary.library.dto.LibraryDtos.UpsertRequest;
+import com.ailibrary.library.service.LibraryService;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 import org.apache.tika.Tika;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @EnableConfigurationProperties(UploadProperties.class)
 public class DocumentService {
+    private static final Logger log = LoggerFactory.getLogger(DocumentService.class);
     private static final Tika TIKA = new Tika();
     private static final Set<String> EXT = Set.of("pdf", "epub", "txt", "md", "markdown");
+
     private final UserDocumentRepository docs;
     private final BookRepository books;
     private final UploadProperties props;
     private final ApplicationEventPublisher events;
     private final JdbcTemplate jdbc;
+    private final LibraryService library;
 
     public DocumentService(
             UserDocumentRepository docs,
             BookRepository books,
             UploadProperties props,
             ApplicationEventPublisher events,
-            JdbcTemplate jdbc) {
+            JdbcTemplate jdbc,
+            LibraryService library) {
         this.docs = docs;
         this.books = books;
         this.props = props;
         this.events = events;
         this.jdbc = jdbc;
+        this.library = library;
     }
 
     @Transactional
@@ -47,6 +60,7 @@ public class DocumentService {
         if (file.getSize() > props.maxBytes())
             throw new BadRequestException(ErrorCode.FILE_TOO_LARGE, "File exceeds maximum size");
         if (bookId != null && !books.existsById(bookId)) throw NotFoundException.book();
+        checkQuota(owner, file.getSize());
         String original = displayName(file.getOriginalFilename());
         String ext = extension(original);
         if (!EXT.contains(ext))
@@ -59,20 +73,37 @@ public class DocumentService {
                     ErrorCode.UNSUPPORTED_FILE_TYPE, "File content type does not match an allowed document format");
         if (!detectedTypeAllowed(ext, detect(file)))
             throw new BadRequestException(ErrorCode.UNSUPPORTED_FILE_TYPE, "File content does not match its extension");
+
+        Path root = root();
+        String key = owner + "/" + UUID.randomUUID() + "." + ext;
+        Path target = root.resolve(key).normalize();
+        if (!target.startsWith(root)) throw new BadRequestException("Invalid path");
         try {
-            Path root = Path.of(props.dir()).toAbsolutePath().normalize();
-            Files.createDirectories(root);
-            String key = owner + "/" + UUID.randomUUID() + "." + ext;
-            Path target = root.resolve(key).normalize();
-            if (!target.startsWith(root)) throw new BadRequestException("Invalid path");
             Files.createDirectories(target.getParent());
             file.transferTo(target);
-            UserDocument doc = docs.save(new UserDocument(owner, bookId, original, contentType, file.getSize(), key));
-            events.publishEvent(new DocumentUploadedEvent(doc.getId()));
-            return view(doc);
         } catch (IOException e) {
+            log.warn("Could not store upload for {}: {}", owner, e.toString());
             throw new BadRequestException("Could not store file");
         }
+        // If the transaction rolls back, the file must not stay behind (SPEC-04 §12.9e).
+        onRollback(() -> deleteQuietly(target));
+        UserDocument doc = docs.save(new UserDocument(owner, bookId, original, contentType, file.getSize(), key));
+        // A document attached to a book puts that book on the shelf as READING (SPEC-04 §8.9).
+        if (bookId != null) library.add(owner, bookId, new UpsertRequest(LibraryStatus.READING, null, null));
+        events.publishEvent(new DocumentUploadedEvent(doc.getId()));
+        return view(doc);
+    }
+
+    /** Re-runs ingestion, e.g. after a failure or an embedding model change (SPEC-04 §8.8). */
+    @Transactional
+    public DocumentView reingest(UUID owner, UUID id) {
+        UserDocument doc = owned(owner, id);
+        if (doc.getStatus() == DocumentStatus.PROCESSING)
+            throw new BadRequestException(ErrorCode.DOCUMENT_NOT_READY, "Document is being processed");
+        doc.queued();
+        docs.save(doc);
+        events.publishEvent(new DocumentUploadedEvent(doc.getId()));
+        return view(doc);
     }
 
     @Transactional(readOnly = true)
@@ -87,33 +118,30 @@ public class DocumentService {
         return docs.findByIdAndOwnerId(id, owner).orElseThrow(NotFoundException::document);
     }
 
+    /** Vector rows and the DB row go in the transaction; the file is removed only after commit (SPEC-04 §8.5). */
     @Transactional
     public void delete(UUID owner, UUID id) {
         UserDocument d = owned(owner, id);
-        try {
-            Files.deleteIfExists(Path.of(props.dir())
-                    .toAbsolutePath()
-                    .normalize()
-                    .resolve(d.getStorageKey())
-                    .normalize());
-        } catch (IOException ignored) {
-        }
+        Path file = path(d);
+        deleteVectors(owner, id);
+        docs.delete(d);
+        onCommit(() -> deleteQuietly(file));
+    }
+
+    public void deleteVectors(UUID owner, UUID documentId) {
         jdbc.update(
                 "DELETE FROM vector_store WHERE metadata->>'documentId' = ? AND metadata->>'ownerId' = ?",
-                id.toString(),
+                documentId.toString(),
                 owner.toString());
-        docs.delete(d);
     }
 
     public Path path(UserDocument d) {
-        return Path.of(props.dir())
-                .toAbsolutePath()
-                .normalize()
-                .resolve(d.getStorageKey())
-                .normalize();
+        return root().resolve(d.getStorageKey()).normalize();
     }
 
     public DocumentView view(UserDocument d) {
+        IngestionFailure failure =
+                d.getStatus() == DocumentStatus.FAILED ? IngestionFailure.fromStored(d.getErrorMessage()) : null;
         return new DocumentView(
                 d.getId(),
                 d.getBookId(),
@@ -121,9 +149,55 @@ public class DocumentService {
                 d.getContentType(),
                 d.getSizeBytes(),
                 d.getStatus(),
-                d.getErrorMessage(),
+                failure == null ? null : failure.name(),
+                failure == null ? null : failure.message(),
                 d.getChunkCount(),
                 d.getCreatedAt());
+    }
+
+    private void checkQuota(UUID owner, long incoming) {
+        long count = docs.countByOwnerId(owner);
+        if (count >= props.maxDocumentsPerUser())
+            throw new BadRequestException(
+                    ErrorCode.QUOTA_EXCEEDED, "Document limit reached (" + props.maxDocumentsPerUser() + ")");
+        long used = docs.sumSizeByOwnerId(owner);
+        if (used + incoming > props.maxBytesPerUser())
+            throw new BadRequestException(ErrorCode.QUOTA_EXCEEDED, "Storage limit reached for your account");
+    }
+
+    private Path root() {
+        return Path.of(props.dir()).toAbsolutePath().normalize();
+    }
+
+    private static void onCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
+    }
+
+    private static void onRollback(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) action.run();
+            }
+        });
+    }
+
+    private static void deleteQuietly(Path file) {
+        try {
+            Files.deleteIfExists(file);
+        } catch (IOException ex) {
+            log.warn("Could not delete {}: {}", file, ex.toString());
+        }
     }
 
     static boolean contentTypeAllowed(String ext, String type) {
@@ -136,7 +210,7 @@ public class DocumentService {
             default -> false;
         };
     }
-    /** Keeps only the last path segment of the client-supplied name; it is display metadata, never a path. */
+
     /** Content sniffing: the declared Content-Type and extension are client-controlled, the magic bytes are not. */
     private static String detect(MultipartFile file) {
         try (var in = file.getInputStream()) {
@@ -155,6 +229,7 @@ public class DocumentService {
         };
     }
 
+    /** Keeps only the last path segment of the client-supplied name; it is display metadata, never a path. */
     static String displayName(String raw) {
         String n = raw == null ? "" : raw.replace('\\', '/');
         n = n.substring(n.lastIndexOf('/') + 1).replaceAll("[\\p{Cntrl}]", "").strip();

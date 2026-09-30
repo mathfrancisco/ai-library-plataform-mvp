@@ -1,5 +1,6 @@
 package com.ailibrary.book.domain;
 
+import com.ailibrary.book.service.BookFingerprint;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
@@ -43,6 +44,10 @@ public class Book {
     @Column(name = "cover_url", columnDefinition = "text")
     private String coverUrl;
 
+    /** Normalized title used for deduplication; see BookFingerprint.normalizeText. */
+    @Column(name = "title_key", length = 500)
+    private String titleKey;
+
     @Column(name = "public_domain", nullable = false)
     private boolean publicDomain;
 
@@ -69,6 +74,7 @@ public class Book {
         this.isbn13 = isbn13;
         this.isbn10 = isbn10;
         this.title = title;
+        this.titleKey = BookFingerprint.normalizeText(title);
         this.subtitle = subtitle;
         this.authorNames = authorNames;
         this.categoryNames = categoryNames;
@@ -91,6 +97,10 @@ public class Book {
 
     public String getIsbn10() {
         return isbn10;
+    }
+
+    public void refreshTitleKey() {
+        this.titleKey = BookFingerprint.normalizeText(title);
     }
 
     public String getTitle() {

@@ -10,8 +10,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class RagService {
-    static final int TOP_K = 6;
-    static final double SIMILARITY_THRESHOLD = 0.60;
 
     private final DocumentService documents;
     private final GroundedAnswerService grounded;
@@ -31,7 +29,9 @@ public class RagService {
                 "DOCUMENT_RAG",
                 question,
                 new GroundedAnswerService.Retrieval(
-                        VectorFilters.documentChunks(owner, documentId), TOP_K, SIMILARITY_THRESHOLD),
+                        VectorFilters.documentChunks(owner, documentId),
+                        grounded.properties().documentTopK(),
+                        grounded.properties().similarityThreshold()),
                 doc.getOriginalName(),
                 "I could not find enough relevant context in this document.");
     }

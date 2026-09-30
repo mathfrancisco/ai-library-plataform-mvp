@@ -1,5 +1,6 @@
 package com.ailibrary.search;
 
+import com.ailibrary.catalog.CatalogPage;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -26,10 +27,21 @@ public final class SearchDtos {
             String matchType,
             List<String> matchedBy) {}
 
-    public record DiscoveryRequest(@NotBlank @Size(max = 1000) String prompt) {}
+    /**
+     * {@code degraded} lists branches that failed or timed out ("lexical", "semantic", "external");
+     * {@code providers} reports each external catalog.
+     */
+    public record SearchResponse(
+            List<SearchHit> results, List<String> degraded, List<CatalogPage.ProviderStatus> providers) {}
+
+    public record DiscoveryRequest(@NotBlank @Size(max = 500) String prompt) {}
 
     /** Typed structured-output target for natural-language discovery. */
     public record DiscoveryPlan(String query, String language, Integer maxPages, List<String> categories) {}
 
-    public record DiscoveryResponse(DiscoveryPlan plan, List<SearchHit> results) {}
+    public record DiscoveryResponse(
+            DiscoveryPlan plan,
+            List<SearchHit> results,
+            List<String> degraded,
+            List<CatalogPage.ProviderStatus> providers) {}
 }

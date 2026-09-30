@@ -19,7 +19,7 @@ class DocumentIngestionWorkerTest {
         when(docs.findByStatusIn(List.of(DocumentStatus.STORED, DocumentStatus.PROCESSING)))
                 .thenReturn(List.of(stored, processing));
 
-        new DocumentIngestionWorker(processor, docs).resumeInterrupted();
+        new DocumentIngestionWorker(processor, docs, Runnable::run).resumeInterrupted();
 
         verify(processor).ingest(stored.getId());
         verify(processor).ingest(processing.getId());

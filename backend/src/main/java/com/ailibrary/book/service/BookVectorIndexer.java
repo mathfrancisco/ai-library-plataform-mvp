@@ -18,18 +18,22 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @Service
 public class BookVectorIndexer {
     private static final Logger log = LoggerFactory.getLogger(BookVectorIndexer.class);
     private final VectorStoreAccess vectors;
+    private final BookRepository books;
 
-    public BookVectorIndexer(VectorStoreAccess vectors) {
+    public BookVectorIndexer(VectorStoreAccess vectors, BookRepository books) {
         this.vectors = vectors;
+        this.books = books;
     }
 
     /** Re-embeds every local book in batches; used after enabling AI or changing the embedding model. */
-    public int reindexAll(BookRepository books) {
+    public int reindexAll() {
         var store = vectors.store()
                 .orElseThrow(() -> new ApiException(
                         ErrorCode.VECTOR_DISABLED, "Vector search is disabled (VECTOR_ENABLED=false)"));
@@ -46,7 +50,13 @@ public class BookVectorIndexer {
         }
     }
 
+    /** Runs after the creating transaction commits, so a rollback never leaves a vector for a missing book. */
     @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onBookSaved(BookSavedEvent event) {
+        books.findById(event.bookId()).ifPresent(this::index);
+    }
+
     public void index(Book book) {
         vectors.store().ifPresent(store -> {
             try {

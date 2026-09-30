@@ -9,16 +9,28 @@ import com.ailibrary.book.service.BookFingerprint;
 import com.ailibrary.book.service.BookMapper;
 import com.ailibrary.book.service.SimilarBookService;
 import com.ailibrary.catalog.CatalogBook;
+import com.ailibrary.catalog.CatalogPage;
 import com.ailibrary.catalog.CatalogService;
 import com.ailibrary.common.error.ApiException;
 import com.ailibrary.common.vector.VectorFilters;
 import com.ailibrary.common.vector.VectorStoreAccess;
 import com.ailibrary.search.SearchDtos.*;
+import jakarta.annotation.PreDestroy;
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 
 /**
@@ -27,32 +39,130 @@ import org.springframework.stereotype.Service;
  * found both locally and externally appears once, keeping its local id.
  */
 @Service
+@EnableConfigurationProperties(SearchProperties.class)
 public class HybridSearchService {
     private static final Logger log = LoggerFactory.getLogger(HybridSearchService.class);
     static final int RRF_K = 60;
     static final double LEXICAL_WEIGHT = 1.0;
     static final double SEMANTIC_WEIGHT = 1.2;
     static final double EXTERNAL_WEIGHT = 0.8;
-    static final double SEMANTIC_THRESHOLD = 0.45;
 
     private final BookRepository books;
     private final CatalogService catalog;
     private final VectorStoreAccess vectors;
     private final AiFacade ai;
+    private final SearchProperties properties;
+    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
-    public HybridSearchService(BookRepository books, CatalogService catalog, VectorStoreAccess vectors, AiFacade ai) {
+    @Autowired
+    public HybridSearchService(
+            BookRepository books,
+            CatalogService catalog,
+            VectorStoreAccess vectors,
+            AiFacade ai,
+            SearchProperties properties) {
         this.books = books;
         this.catalog = catalog;
         this.vectors = vectors;
         this.ai = ai;
+        this.properties = properties;
     }
 
-    public List<SearchHit> search(String query, SearchMode mode, int limit) {
+    HybridSearchService(BookRepository books, CatalogService catalog, VectorStoreAccess vectors, AiFacade ai) {
+        this(books, catalog, vectors, ai, new SearchProperties(null, null, null, null));
+    }
+
+    @PreDestroy
+    void shutdown() {
+        executor.shutdownNow();
+    }
+
+    /** Filters from a discovery plan; null fields do not filter. */
+    public record Filters(String language, List<String> categories) {
+        static final Filters NONE = new Filters(null, List.of());
+    }
+
+    public SearchResponse search(String query, SearchMode mode, int limit) {
+        return search(query, mode, limit, Filters.NONE);
+    }
+
+    /** Runs the three branches in parallel, each with its own timeout; a failed branch is reported as degraded. */
+    public SearchResponse search(String query, SearchMode mode, int limit, Filters filters) {
         String q = query.trim();
-        List<Book> lexical = mode == SearchMode.SEMANTIC ? List.of() : lexical(q, limit);
-        List<Book> semantic = mode == SearchMode.LEXICAL ? List.of() : semantic(q, limit);
-        List<CatalogBook> external = mode == SearchMode.SEMANTIC ? List.of() : external(q, limit);
-        return fuse(lexical, semantic, external, limit);
+        var lexical = branch(mode != SearchMode.SEMANTIC, () -> lexical(q, limit));
+        var semantic = branch(mode != SearchMode.LEXICAL, () -> semantic(q, limit));
+        var external = branch(mode != SearchMode.SEMANTIC, () -> catalog.search(q, 1, limit));
+
+        List<String> degraded = new ArrayList<>();
+        List<Book> lexicalHits = await(lexical, properties.lexicalTimeout(), "lexical", degraded, List.of());
+        List<Book> semanticHits = await(semantic, properties.semanticTimeout(), "semantic", degraded, List.of());
+        CatalogPage page =
+                await(external, properties.externalTimeout(), "external", degraded, new CatalogPage(List.of(), 0));
+        if (!page.complete() && !degraded.contains("external")) degraded.add("external");
+
+        List<SearchHit> hits = fuse(
+                lexicalHits.stream()
+                        .filter(b -> matches(filters, b.getLanguage(), b.getCategoryNames()))
+                        .toList(),
+                semanticHits.stream()
+                        .filter(b -> matches(filters, b.getLanguage(), b.getCategoryNames()))
+                        .toList(),
+                page.items().stream()
+                        .filter(b -> matches(filters, b.language(), String.join("|", b.categories())))
+                        .toList(),
+                limit);
+        return new SearchResponse(hits, List.copyOf(degraded), page.providers());
+    }
+
+    private <T> Future<T> branch(boolean enabled, Callable<T> task) {
+        return enabled ? executor.submit(task) : null;
+    }
+
+    private static <T> T await(Future<T> future, Duration timeout, String name, List<String> degraded, T empty) {
+        if (future == null) return empty;
+        try {
+            return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException ex) {
+            future.cancel(true);
+            log.warn("Search branch {} timed out after {}", name, timeout);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException ex) {
+            log.warn("Search branch {} failed: {}", name, ex.getCause().toString());
+        }
+        degraded.add(name);
+        return empty;
+    }
+
+    /**
+     * Language compares ISO 639 codes in 2- or 3-letter form; categories need one overlapping term. Hits with no
+     * language or categories are kept: missing data never filters a book out.
+     */
+    static boolean matches(Filters filters, String language, String categories) {
+        if (filters.language() != null
+                && language != null
+                && !filters.language().isBlank()) {
+            if (!iso3(filters.language()).equals(iso3(language))) return false;
+        }
+        if (filters.categories() != null
+                && !filters.categories().isEmpty()
+                && categories != null
+                && !categories.isBlank()) {
+            String have = BookFingerprint.normalizeText(categories);
+            return filters.categories().stream()
+                    .map(BookFingerprint::normalizeText)
+                    .anyMatch(c -> !c.isEmpty() && have.contains(c));
+        }
+        return true;
+    }
+
+    private static String iso3(String code) {
+        String c = code.trim().toLowerCase(Locale.ROOT);
+        try {
+            return c.length() == 2 ? Locale.of(c).getISO3Language() : c;
+        } catch (MissingResourceException ex) {
+            return c;
+        }
     }
 
     static List<SearchHit> fuse(List<Book> lexical, List<Book> semantic, List<CatalogBook> external, int limit) {
@@ -77,7 +187,12 @@ public class HybridSearchService {
     public DiscoveryResponse discover(UUID userId, String prompt, int limit) {
         DiscoveryPlan plan = plan(userId, prompt);
         String query = plan.query() == null || plan.query().isBlank() ? prompt : plan.query();
-        return new DiscoveryResponse(plan, search(query, SearchMode.HYBRID, limit));
+        SearchResponse found = search(
+                query,
+                SearchMode.HYBRID,
+                limit,
+                new Filters(plan.language(), plan.categories() == null ? List.of() : plan.categories()));
+        return new DiscoveryResponse(plan, found.results(), found.degraded(), found.providers());
     }
 
     /** FAST model first; one SMART retry when the fast model's output fails schema validation. */
@@ -101,42 +216,28 @@ public class HybridSearchService {
     }
 
     private List<Book> lexical(String query, int limit) {
-        try {
-            return books.lexicalSearch(query, limit);
-        } catch (RuntimeException ex) {
-            log.warn("Lexical search failed: {}", ex.getMessage());
-            return List.of();
-        }
+        return books.lexicalSearch(query, limit);
     }
 
     private List<Book> semantic(String query, int limit) {
         var store = vectors.store();
         if (store.isEmpty()) return List.of();
-        try {
-            List<Document> docs = store.get()
-                    .similaritySearch(SearchRequest.builder()
-                            .query(query)
-                            .topK(limit)
-                            .similarityThreshold(SEMANTIC_THRESHOLD)
-                            .filterExpression(VectorFilters.books())
-                            .build());
-            if (docs == null) return List.of();
-            List<UUID> ids = docs.stream()
-                    .map(SimilarBookService::bookId)
-                    .flatMap(Optional::stream)
-                    .distinct()
-                    .toList();
-            Map<UUID, Book> byId = new HashMap<>();
-            books.findAllById(ids).forEach(b -> byId.put(b.getId(), b));
-            return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
-        } catch (RuntimeException ex) {
-            log.warn("Semantic search failed: {}", ex.getMessage());
-            return List.of();
-        }
-    }
-
-    private List<CatalogBook> external(String query, int limit) {
-        return catalog.search(query, 1, limit).items();
+        List<Document> docs = store.get()
+                .similaritySearch(SearchRequest.builder()
+                        .query(query)
+                        .topK(limit)
+                        .similarityThreshold(properties.semanticThreshold())
+                        .filterExpression(VectorFilters.books())
+                        .build());
+        if (docs == null) return List.of();
+        List<UUID> ids = docs.stream()
+                .map(SimilarBookService::bookId)
+                .flatMap(Optional::stream)
+                .distinct()
+                .toList();
+        Map<UUID, Book> byId = new HashMap<>();
+        books.findAllById(ids).forEach(b -> byId.put(b.getId(), b));
+        return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
     private static void addLocal(List<Book> ranked, String matchType, double weight, Map<String, MutableHit> out) {
