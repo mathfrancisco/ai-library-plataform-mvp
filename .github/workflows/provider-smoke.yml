@@ -34,18 +34,31 @@ jobs:
                   with urllib.request.urlopen(req, timeout=20) as response:
                       return json.load(response)
               except urllib.error.HTTPError as exc:
+                  media_type = exc.headers.get_content_type()
                   try:
-                      code = json.load(exc).get("error", {}).get("code", "")
+                      error = json.load(exc).get("error", {})
+                      code = error.get("code") or error.get("type") or ""
                   except (ValueError, AttributeError):
                       code = ""
                   detail = f" ({code})" if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,80}", code) else ""
-                  raise RuntimeError(f"HTTP {exc.code}{detail}") from None
+                  raise RuntimeError(f"HTTP {exc.code} [{media_type}]{detail}") from None
               except urllib.error.URLError:
                   raise RuntimeError("network request failed") from None
 
           for name in ("GROQ_API_KEY", "GOOGLE_BOOKS_API_KEY", "OPEN_LIBRARY_USER_AGENT"):
               if not os.environ.get(name, "").strip():
                   sys.exit(f"Missing environment secret: {name}")
+
+          def check_groq_reachability():
+              try:
+                  urllib.request.urlopen("https://api.groq.com/openai/v1/models", timeout=20)
+              except urllib.error.HTTPError as exc:
+                  if exc.code == 401:
+                      return
+                  raise RuntimeError(f"unauthenticated request returned HTTP {exc.code}") from None
+              except urllib.error.URLError:
+                  raise RuntimeError("network request failed") from None
+              raise RuntimeError("unauthenticated request unexpectedly succeeded")
 
           def check_groq_models():
               models = request(
@@ -91,6 +104,7 @@ jobs:
 
           failures = []
           for name, check in (
+              ("Groq reachability", check_groq_reachability),
               ("Groq models", check_groq_models),
               ("Groq chat", check_groq_chat),
               ("Google Books", check_google),
