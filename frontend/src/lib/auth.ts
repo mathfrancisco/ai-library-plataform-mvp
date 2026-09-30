@@ -44,3 +44,13 @@ export function useSignedIn() {
     () => false,
   );
 }
+
+const noopSubscribe = () => () => {};
+/** False during SSR and the first hydration pass, true afterwards; lets guards wait before redirecting. */
+export function useSessionKnown() {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
+}

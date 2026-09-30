@@ -1,9 +1,6 @@
-import { errorMessage } from "@/lib/api";
+import { ErrorState } from "./ErrorState";
+
+/** Inline error without retry. */
 export function ErrorNote({ error }: { error: unknown }) {
-  if (!error) return null;
-  return (
-    <p role="alert" className="errornote">
-      {errorMessage(error)}
-    </p>
-  );
+  return <ErrorState error={error} />;
 }

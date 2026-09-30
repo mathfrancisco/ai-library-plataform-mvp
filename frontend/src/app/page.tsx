@@ -1,5 +1,15 @@
+"use client";
 import Link from "next/link";
+import { useSignedIn } from "@/lib/auth";
+
+const steps = [
+  ["Search", "Find books by title, author, ISBN or by describing what you want to read."],
+  ["Shelve", "Track what you want to read, are reading and finished, with ratings and progress."],
+  ["Ask", "Upload files you are allowed to use and ask questions answered from them, with sources."],
+];
+
 export default function Home() {
+  const signedIn = useSignedIn();
   return (
     <main className="shell">
       <section className="hero">
@@ -18,9 +28,15 @@ export default function Home() {
             <Link className="btn" href="/explore">
               Explore books
             </Link>
-            <Link className="btn secondary" href="/ai">
-              Open AI assistant
-            </Link>
+            {signedIn ? (
+              <Link className="btn secondary" href="/library">
+                Go to my library
+              </Link>
+            ) : (
+              <Link className="btn secondary" href="/login?mode=register">
+                Create a free account
+              </Link>
+            )}
           </div>
         </div>
         <div className="heroPanel">
@@ -32,7 +48,7 @@ export default function Home() {
               <b>AI</b>
             </div>
             <div>
-              <span>2 · Lexical + vector search</span>
+              <span>2 · Keyword + meaning search</span>
               <b>Hybrid</b>
             </div>
             <div>
@@ -40,11 +56,23 @@ export default function Home() {
               <b>Open Library</b>
             </div>
             <div>
-              <span>4 · Rerank & dedupe</span>
+              <span>4 · Merge & dedupe</span>
               <b>RRF</b>
             </div>
           </div>
         </div>
+      </section>
+      <section aria-labelledby="how" className="how">
+        <h2 id="how">How it works</h2>
+        <ol className="steps">
+          {steps.map(([title, body], i) => (
+            <li key={title} className="panel">
+              <span className="stepnum">{i + 1}</span>
+              <h3>{title}</h3>
+              <p className="muted">{body}</p>
+            </li>
+          ))}
+        </ol>
       </section>
     </main>
   );

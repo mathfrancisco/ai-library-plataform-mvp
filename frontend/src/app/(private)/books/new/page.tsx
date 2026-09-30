@@ -4,15 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { useSignedIn } from "@/lib/auth";
 import { ErrorNote } from "@/components/ErrorNote";
-import { Empty } from "@/components/Empty";
 import type { Book } from "@/types/api";
 import { LIBRARY_STATUSES } from "@/types/api";
 import { emptyBookForm, toCreateRequest, type BookForm } from "@/lib/books";
 
 export default function NewBookPage() {
-  const signedIn = useSignedIn();
   const router = useRouter();
   const [f, setF] = useState<BookForm>(emptyBookForm);
   const set =
@@ -34,22 +31,8 @@ export default function NewBookPage() {
     },
     onSuccess: (b) => router.push(`/book/${b.id}`),
   });
-  if (!signedIn)
-    return (
-      <main className="shell">
-        <Empty
-          title="Sign in to add books"
-          body="Manual registration is for books the catalogs don't have."
-        />
-        <p style={{ textAlign: "center" }}>
-          <Link className="btn" href="/login">
-            Sign in
-          </Link>
-        </p>
-      </main>
-    );
   return (
-    <main className="shell" style={{ maxWidth: 820 }}>
+    <main className="shell narrow">
       <div className="sectionhead">
         <div>
           <p className="eyebrow">Catalog</p>
@@ -133,7 +116,8 @@ export default function NewBookPage() {
           <input
             className="input"
             type="url"
-            pattern="https?://.*"
+            pattern="https://.*"
+            title="Must start with https://"
             value={f.coverUrl}
             onChange={set("coverUrl")}
           />
@@ -153,7 +137,7 @@ export default function NewBookPage() {
             ))}
           </select>
         </label>
-        <label style={{ alignContent: "end" }}>
+        <label className="content-end">
           <span>
             <input type="checkbox" checked={f.publicDomain} onChange={set("publicDomain")} /> Public domain
           </span>

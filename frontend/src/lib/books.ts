@@ -34,22 +34,25 @@ export const emptyBookForm: BookForm = {
 };
 
 /** The API stores multi-valued names as " | "-separated text; the form accepts commas. */
+/** Form strings to the API request: comma lists to arrays, ISBNs to digits only, blanks dropped. */
 export function toCreateRequest(f: BookForm) {
-  const list = (v: string) =>
-    v
+  const list = (v: string) => {
+    const items = v
       .split(/[,|]/)
       .map((x) => x.trim())
-      .filter(Boolean)
-      .join(" | ") || undefined;
+      .filter(Boolean);
+    return items.length ? items : undefined;
+  };
   const text = (v: string) => v.trim() || undefined;
   const num = (v: string) => (v.trim() ? Number(v) : undefined);
+  const isbn = (v: string) => v.replace(/[^0-9Xx]/g, "").toUpperCase() || undefined;
   return {
     title: f.title.trim(),
     subtitle: text(f.subtitle),
-    authorNames: list(f.authors),
-    categoryNames: list(f.categories),
-    isbn13: text(f.isbn13),
-    isbn10: text(f.isbn10),
+    authors: list(f.authors),
+    categories: list(f.categories),
+    isbn13: isbn(f.isbn13),
+    isbn10: isbn(f.isbn10),
     description: text(f.description),
     publisher: text(f.publisher),
     language: text(f.language),

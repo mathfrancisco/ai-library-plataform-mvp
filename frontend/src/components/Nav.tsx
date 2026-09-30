@@ -1,9 +1,12 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { BookOpen, Bot, Library, Search, Gauge, Upload, Settings, Menu, X } from "lucide-react";
+import { BookOpen, Bot, Library, Search, Gauge, Upload, Menu, X, ChevronDown } from "lucide-react";
 import { useSignedIn } from "@/lib/auth";
+import { useMe } from "@/lib/hooks";
+import { logout } from "@/lib/api";
+
 const links = [
   ["/explore", "Explore", Search],
   ["/library", "Library", Library],
@@ -11,42 +14,72 @@ const links = [
   ["/ai", "Assistant", Bot],
   ["/dashboard", "Dashboard", Gauge],
 ] as const;
+
 export function Nav() {
   const signedIn = useSignedIn();
+  const me = useMe();
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const account = signedIn ? (
-    <Link className="pill" href="/settings" onClick={() => setOpen(false)}>
-      <Settings size={14} />
-      Settings
-    </Link>
-  ) : (
-    <Link className="pill" href="/login" onClick={() => setOpen(false)}>
-      Sign in
-    </Link>
-  );
+  const [account, setAccount] = useState(false);
+  const close = () => {
+    setOpen(false);
+    setAccount(false);
+  };
+  async function signOut() {
+    close();
+    await logout();
+    router.push("/login");
+  }
   return (
     <header className="nav">
-      <Link href="/" className="brand">
+      <Link href="/" className="brand" onClick={close}>
         <span className="brandmark">
           <BookOpen size={20} />
         </span>
         <span>ShelfMind</span>
       </Link>
-      <nav id="main-nav" className={open ? "open" : ""}>
+      <nav id="main-nav" className={open ? "open" : ""} aria-label="Main">
         {links.map(([href, label, Icon]) => (
           <Link
             href={href}
             key={href}
             aria-current={pathname?.startsWith(href) ? "page" : undefined}
-            onClick={() => setOpen(false)}
+            onClick={close}
           >
             <Icon size={16} />
             {label}
           </Link>
         ))}
       </nav>
-      {account}
+      {signedIn ? (
+        <div className="account">
+          <button
+            type="button"
+            className="pill"
+            aria-haspopup="menu"
+            aria-expanded={account}
+            onClick={() => setAccount((v) => !v)}
+          >
+            {me.data?.displayName ?? "Account"}
+            <ChevronDown size={14} />
+          </button>
+          {account && (
+            <div className="menu" role="menu">
+              <Link role="menuitem" href="/settings" onClick={close}>
+                Settings
+              </Link>
+              <button role="menuitem" onClick={signOut}>
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <Link className="pill" href="/login" onClick={close}>
+          Sign in
+        </Link>
+      )}
       <button
         type="button"
         className="menubtn"

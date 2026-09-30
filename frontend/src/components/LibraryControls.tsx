@@ -1,6 +1,6 @@
 "use client";
 import { LIBRARY_STATUSES, type LibraryStatus } from "@/types/api";
-export type LibraryPatch = { status?: LibraryStatus; favorite?: boolean; rating?: number };
+
 export function StatusSelect({
   value,
   onChange,
@@ -13,8 +13,7 @@ export function StatusSelect({
   return (
     <select
       aria-label="Reading status"
-      className="select"
-      style={{ maxWidth: 170, padding: "8px 10px" }}
+      className="select compact"
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as LibraryStatus)}
@@ -27,6 +26,7 @@ export function StatusSelect({
     </select>
   );
 }
+
 export function FavoriteToggle({
   value,
   onChange,
@@ -49,26 +49,29 @@ export function FavoriteToggle({
     </button>
   );
 }
-export function Rating({
+
+/** Clicking the current rating again clears it (sends 0). */
+export function RatingStars({
   value,
   onChange,
   disabled,
 }: {
-  value?: number;
+  value?: number | null;
   onChange: (v: number) => void;
   disabled?: boolean;
 }) {
+  const current = value ?? 0;
   return (
     <span className="stars" role="group" aria-label="Rating">
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           type="button"
           key={n}
-          aria-label={`Rate ${n}`}
-          aria-pressed={(value ?? 0) >= n}
-          className={(value ?? 0) >= n ? "on" : ""}
+          aria-label={current === n ? `Clear rating` : `Rate ${n}`}
+          aria-pressed={current >= n}
+          className={current >= n ? "on" : ""}
           disabled={disabled}
-          onClick={() => onChange(n)}
+          onClick={() => onChange(current === n ? 0 : n)}
         >
           ★
         </button>
