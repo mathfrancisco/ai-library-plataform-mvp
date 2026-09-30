@@ -1,9 +1,11 @@
-FROM maven:3.9.11-eclipse-temurin-21 AS build
+# syntax=docker/dockerfile:1
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
-COPY pom.xml .
-RUN mvn -q -DskipTests dependency:go-offline
+COPY mvnw pom.xml ./
+COPY .mvn .mvn
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -q -B dependency:go-offline
 COPY src ./src
-RUN mvn -q -DskipTests package
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -q -B -DskipTests package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app

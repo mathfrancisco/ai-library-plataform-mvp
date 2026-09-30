@@ -10,7 +10,7 @@ logs:
 	docker compose logs -f
 
 backend-test:
-	cd backend && mvn test
+	cd backend && ./mvnw test
 
 frontend-test:
 	cd frontend && npm test

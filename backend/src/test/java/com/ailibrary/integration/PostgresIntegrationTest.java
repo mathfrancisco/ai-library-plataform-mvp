@@ -4,7 +4,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.DockerClientFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
@@ -21,9 +21,11 @@ abstract class PostgresIntegrationTest {
     static final String DATABASE_AVAILABLE = "com.ailibrary.integration.PostgresIntegrationTest#databaseAvailable";
     private static final DockerImageName IMAGE = DockerImageName.parse("pgvector/pgvector:pg17")
             .asCompatibleSubstituteFor("postgres");
-    private static PostgreSQLContainer<?> postgres;
+    private static PostgreSQLContainer postgres;
 
     static boolean databaseAvailable() {
+        // CI passes -Dtestcontainers.required=true so a missing Docker fails the build instead of skipping.
+        if (Boolean.getBoolean("testcontainers.required")) return true;
         if (System.getenv("TEST_DATABASE_URL") != null) return true;
         try {
             return DockerClientFactory.instance().isDockerAvailable();
@@ -43,7 +45,7 @@ abstract class PostgresIntegrationTest {
         }
         synchronized (PostgresIntegrationTest.class) {
             if (postgres == null) {
-                postgres = new PostgreSQLContainer<>(IMAGE).withDatabaseName("ailibrary").withUsername("ailibrary").withPassword("ailibrary");
+                postgres = new PostgreSQLContainer(IMAGE).withDatabaseName("ailibrary").withUsername("ailibrary").withPassword("ailibrary");
                 postgres.start();
             }
         }
