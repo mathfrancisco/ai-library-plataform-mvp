@@ -3,7 +3,7 @@ import type { ApiErrorBody } from "@/types/api";
 
 /**
  * Same-origin by default: the browser calls /api/* on the frontend, and Next rewrites it to the backend
- * (API_INTERNAL_URL, see next.config.ts). NEXT_PUBLIC_API_URL is only for running the UI against a remote API.
+ * (API_INTERNAL_URL, see src/proxy.ts). NEXT_PUBLIC_API_URL is only for running the UI against a remote API.
  */
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 

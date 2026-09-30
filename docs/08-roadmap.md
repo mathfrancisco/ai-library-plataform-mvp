@@ -1,5 +1,26 @@
 # Development Roadmap
 
+## Status (2026-09-30)
+
+Status after the specs in [`docs/specs`](specs/README.md) were implemented. **Done** = implemented and covered by
+tests; **partial** = usable, with the listed gap.
+
+| Phase | Status | Notes / specs |
+|---|---|---|
+| 0 — Foundation | done | SPEC-01, SPEC-03 (formatting), SPEC-08 (compose, healthchecks) |
+| 1 — Authentication | done | reuse detection, account deletion, admin emails — SPEC-04 §2 |
+| 2 — External catalog | done | Open Library + optional Google Books, dedup by ISBN/title key — SPEC-04 §3 |
+| 3 — Personal library | done | rules in `LibraryService` — SPEC-03, SPEC-04 §4 |
+| 4 — Hybrid search | done | parallel branches, degraded flags, local embeddings — SPEC-02, SPEC-04 §12 |
+| 5 — AI layer | done | Groq tiers, per-user + global limits, request logs — SPEC-02, SPEC-04 §10 |
+| 6 — Documents + RAG | done | quotas, context cap, citation check, iterative HNSW scan — SPEC-04 §6–9 |
+| 7 — Recommendations | done | threshold 0.30 with MiniLM — SPEC-02 |
+| 8 — Dashboard | done | SPEC-05 |
+| 9 — Quality | partial | unit + Testcontainers ITs, MSW frontend tests, CodeQL, Trivy, Dependabot (SPEC-06, SPEC-08). Missing: Playwright E2E, provider-backed AI eval workflow |
+| 10 — Deployment | partial | images build in CI and prod profile exists; deploy path documented in [12-deployment.md](12-deployment.md). Missing: registry push, object storage, a live environment |
+
+The phase descriptions below are the original plan and are kept for reference.
+
 ## Phase 0 — Foundation
 
 **Goal:** runnable monorepo.

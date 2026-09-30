@@ -43,6 +43,35 @@ Do not crawl HTML pages. Gutenberg publishes:
 
 The MVP documents the adapter boundary but does not continuously mirror the catalog. A V2 importer can use OPDS for interactive browsing or a scheduled metadata snapshot for a self-hosted index.
 
+## Groq — chat model provider
+
+Chat, structured output and tool calling go to Groq through its OpenAI-compatible API
+(`spring.ai.model.chat=openai`, `GROQ_BASE_URL=https://api.groq.com/openai/v1`). Groq has no embeddings API, so
+embeddings run locally (see [06-spring-ai-rag.md](06-spring-ai-rag.md) and
+[ADR-004](decisions/ADR-004-groq-chat-local-embeddings.md)).
+
+| Tier | Default model | Used by |
+|---|---|---|
+| `FAST` | `llama-3.1-8b-instant` (`AI_MODEL_FAST`) | book summaries, first discovery attempt |
+| `SMART` | `llama-3.3-70b-versatile` (`AI_MODEL_SMART`) | RAG answers, assistant tool calling, discovery retry |
+
+Limits on our side (free-tier friendly, both configurable):
+
+- per user: `AI_RATE_LIMIT_PER_MINUTE` (default 20);
+- whole instance: `AI_GLOBAL_RATE_PER_MINUTE` (default 25), kept under Groq's free-tier requests/minute.
+
+Timeout is `AI_TIMEOUT` (default 45 s) with one SDK retry. `AiFacade` maps provider failures to stable API errors:
+
+| Provider failure | API error |
+|---|---|
+| HTTP 429 / rate-limit exception | `429 AI_RATE_LIMITED` |
+| socket/HTTP timeout | `504 AI_TIMEOUT` |
+| anything else | `502 AI_PROVIDER_ERROR` |
+| `AI_ENABLED=false` | `503 AI_DISABLED` (no call is made) |
+
+Every call, success or failure, writes an `ai_request_logs` row with the model actually used, token counts and
+latency, in its own transaction.
+
 ## Provider abstraction
 
 ```mermaid
