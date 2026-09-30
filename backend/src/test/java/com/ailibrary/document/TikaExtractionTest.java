@@ -68,7 +68,9 @@ class TikaExtractionTest {
                     """
                     <?xml version="1.0"?>
                     <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
-                      <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">test</dc:identifier><dc:title>Test</dc:title><dc:language>en</dc:language></metadata>
+                      <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                        <dc:identifier id="id">test</dc:identifier><dc:title>Test</dc:title><dc:language>en</dc:language>
+                      </metadata>
                       <manifest><item id="c1" href="chapter1.xhtml" media-type="application/xhtml+xml"/></manifest>
                       <spine><itemref idref="c1"/></spine>
                     </package>""");

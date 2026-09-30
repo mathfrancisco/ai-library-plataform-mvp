@@ -16,8 +16,20 @@ import tools.jackson.databind.JsonNode;
 @EnableConfigurationProperties(CatalogProperties.class)
 public class OpenLibraryProvider implements BookCatalogProvider {
     static final String NAME = "open-library";
-    static final String SEARCH_FIELDS =
-            "key,title,subtitle,author_name,isbn,first_publish_year,cover_i,language,publisher,subject,number_of_pages_median,public_scan_b";
+    static final String SEARCH_FIELDS = String.join(
+            ",",
+            "key",
+            "title",
+            "subtitle",
+            "author_name",
+            "isbn",
+            "first_publish_year",
+            "cover_i",
+            "language",
+            "publisher",
+            "subject",
+            "number_of_pages_median",
+            "public_scan_b");
     private static final Pattern WORK_KEY = Pattern.compile("^/works/OL\\d+W$");
 
     private final RestClient client;

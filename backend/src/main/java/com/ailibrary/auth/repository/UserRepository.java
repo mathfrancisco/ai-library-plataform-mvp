@@ -16,6 +16,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Modifying
     @Query(
-            "update User u set u.role = com.ailibrary.auth.domain.Role.ADMIN where lower(u.email) in :emails and u.role <> com.ailibrary.auth.domain.Role.ADMIN")
+            """
+            update User u set u.role = com.ailibrary.auth.domain.Role.ADMIN
+            where lower(u.email) in :emails and u.role <> com.ailibrary.auth.domain.Role.ADMIN
+            """)
     int promoteToAdmin(@Param("emails") Collection<String> emails);
 }
