@@ -15,8 +15,7 @@ class AiPropertiesTest {
 
     @Test
     void preservesConfiguredModelOverrides() {
-        var properties = new AiProperties(
-                true, "groq", new AiProperties.Models("fast-custom", "smart-custom"), 20, 25);
+        var properties = new AiProperties(true, "groq", new AiProperties.Models("fast-custom", "smart-custom"), 20, 25);
 
         assertThat(properties.model(ModelTier.FAST)).isEqualTo("fast-custom");
         assertThat(properties.model(ModelTier.SMART)).isEqualTo("smart-custom");
