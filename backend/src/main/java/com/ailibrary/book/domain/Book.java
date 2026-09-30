@@ -1,7 +1,7 @@
 package com.ailibrary.book.domain;
 
+import com.ailibrary.book.service.BookFingerprint;
 import jakarta.persistence.*;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -44,6 +44,10 @@ public class Book {
     @Column(name = "cover_url", columnDefinition = "text")
     private String coverUrl;
 
+    /** Normalized title used for deduplication; see BookFingerprint.normalizeText. */
+    @Column(name = "title_key", length = 500)
+    private String titleKey;
+
     @Column(name = "public_domain", nullable = false)
     private boolean publicDomain;
 
@@ -52,13 +56,25 @@ public class Book {
 
     protected Book() {}
 
-    public Book(String isbn13, String isbn10, String title, String subtitle, String authorNames,
-                String categoryNames, String description, String language, String publisher,
-                Integer publishedYear, Integer pageCount, String coverUrl, boolean publicDomain) {
+    public Book(
+            String isbn13,
+            String isbn10,
+            String title,
+            String subtitle,
+            String authorNames,
+            String categoryNames,
+            String description,
+            String language,
+            String publisher,
+            Integer publishedYear,
+            Integer pageCount,
+            String coverUrl,
+            boolean publicDomain) {
         this.id = UUID.randomUUID();
         this.isbn13 = isbn13;
         this.isbn10 = isbn10;
         this.title = title;
+        this.titleKey = BookFingerprint.normalizeText(title);
         this.subtitle = subtitle;
         this.authorNames = authorNames;
         this.categoryNames = categoryNames;
@@ -71,19 +87,67 @@ public class Book {
         this.publicDomain = publicDomain;
     }
 
-    public UUID getId() { return id; }
-    public String getIsbn13() { return isbn13; }
-    public String getIsbn10() { return isbn10; }
-    public String getTitle() { return title; }
-    public String getSubtitle() { return subtitle; }
-    public String getAuthorNames() { return authorNames; }
-    public String getCategoryNames() { return categoryNames; }
-    public String getDescription() { return description; }
-    public String getLanguage() { return language; }
-    public String getPublisher() { return publisher; }
-    public Integer getPublishedYear() { return publishedYear; }
-    public Integer getPageCount() { return pageCount; }
-    public String getCoverUrl() { return coverUrl; }
-    public boolean isPublicDomain() { return publicDomain; }
-    public Instant getCreatedAt() { return createdAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public String getIsbn13() {
+        return isbn13;
+    }
+
+    public String getIsbn10() {
+        return isbn10;
+    }
+
+    public void refreshTitleKey() {
+        this.titleKey = BookFingerprint.normalizeText(title);
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getSubtitle() {
+        return subtitle;
+    }
+
+    public String getAuthorNames() {
+        return authorNames;
+    }
+
+    public String getCategoryNames() {
+        return categoryNames;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public String getPublisher() {
+        return publisher;
+    }
+
+    public Integer getPublishedYear() {
+        return publishedYear;
+    }
+
+    public Integer getPageCount() {
+        return pageCount;
+    }
+
+    public String getCoverUrl() {
+        return coverUrl;
+    }
+
+    public boolean isPublicDomain() {
+        return publicDomain;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
 }

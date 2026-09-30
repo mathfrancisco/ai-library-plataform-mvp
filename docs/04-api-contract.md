@@ -1,120 +1,123 @@
 # REST API Contract
 
-Base path: `/api`
+This file is a short index. The full, generated contract (request/response schemas, parameters, status codes) is
+served by the backend outside the `prod` profile:
+
+- OpenAPI JSON: `GET /v3/api-docs`
+- Swagger UI: `/swagger-ui.html`
+
+Base path: `/api`. The browser calls `/api/*` on the frontend origin; the Next proxy forwards to the backend.
+Authenticated endpoints need `Authorization: Bearer <access token>`.
 
 ## Auth
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/auth/register` | Create account and return access/refresh tokens |
-| POST | `/auth/login` | Authenticate |
-| POST | `/auth/refresh` | Rotate refresh token and issue new access token |
-| POST | `/auth/logout` | Revoke refresh token |
-| GET | `/auth/me` | Current user profile |
+| POST | `/auth/register` | Create account (201) and return access/refresh tokens |
+| POST | `/auth/login` | Authenticate (limited per IP + email) |
+| POST | `/auth/refresh` | Rotate refresh token; reusing a rotated token revokes every session of the user |
+| POST | `/auth/logout` | Revoke one refresh token |
+| POST | `/auth/logout-all` | Revoke every refresh token of the current user |
+| GET / PATCH | `/auth/me` | Current profile (`createdAt` included) / change display name |
+| POST | `/auth/me/password` | Change password; other sessions are revoked, a new pair is returned |
+| DELETE | `/auth/me` | Delete the account and all its data (`{"password": "…"}`) |
 
-## Catalog / books
+## Catalog and books
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/catalog/search?q=&page=&size=` | Federated external search |
-| POST | `/catalog/import` | Normalize + persist one external catalog result |
-| POST | `/books` | Manual book registration |
-| GET | `/books/{id}` | Local persisted book detail |
-| GET | `/books/{id}/similar` | Similar locally indexed books |
-| POST | `/books/{id}/summary?type=SHORT` | Generate/read cached AI summary |
-| POST | `/books/{id}/chat` | Grounded RAG across current user's permitted documents linked to the book |
+| GET | `/catalog/search?q=&page=&size=` | Federated external search; `total` is approximate, `providers[]` reports each provider |
+| POST | `/catalog/import` | Persist one external record (`provider` must be `open-library` or `google-books`) |
+| POST | `/books` | Manual registration: 201 when created, 200 with the existing book when it is a duplicate |
+| GET | `/books/{id}` | Local book detail |
+| GET | `/books/{id}/similar` | Similar local books (vector similarity) |
+| POST | `/books/{id}/summary?type=TLDR\|SHORT\|TAKEAWAYS` | Cached AI summary of the catalog description |
+| POST | `/books/{id}/chat` | Grounded RAG over the user's documents attached to the book |
 
 ## Search
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/search?q=&mode=HYBRID&limit=20` | Hybrid local semantic + FTS + external search |
-| POST | `/search/discover` | Natural-language discovery request (`{"prompt": "..."}`) |
+| GET | `/search?q=&mode=&limit=` | `{results, degraded, providers}`; modes `HYBRID`, `LEXICAL`, `SEMANTIC` |
+| POST | `/search/discover` | Natural language (`{"prompt": "…"}`, ≤ 500 chars) → plan + filtered results |
 
-Modes: `LEXICAL` (local FTS + external), `SEMANTIC` (local vectors only), `HYBRID` (all three).
+Anonymous search is limited to 30 requests/min per IP, signed-in search to 120/min per user.
+Each hit has `matchType` (`LEXICAL`, `SEMANTIC`, `EXTERNAL`, or `HYBRID` when several sources agree) and `matchedBy`.
 
-Each `SearchHit` carries `matchType` (`LEXICAL`, `SEMANTIC`, `EXTERNAL`, or `HYBRID` when several sources agreed) and
-`matchedBy` (the contributing sources). Local and external copies of the same book are merged by ISBN-13 → ISBN-10 →
-normalized title + first author, keeping the local `localBookId`.
-
-## Personal library
+## Personal library and reading
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/library?status=` | User library |
-| POST | `/library/books/{bookId}` | Add/update a local book in library |
-| PATCH | `/library/books/{bookId}` | Status/favorite/rating update |
-| DELETE | `/library/books/{bookId}` | Remove from library |
+| GET | `/library?status=` | Compact items (no description) with progress percentage |
+| GET | `/library/books/{bookId}` | One item with full book and progress; 404 when not on the shelf |
+| POST | `/library/books/{bookId}` | Add (idempotent: returns the existing item unchanged) |
+| PATCH | `/library/books/{bookId}` | Update status/favorite/rating (`rating: 0` clears); 404 when not on the shelf |
+| DELETE | `/library/books/{bookId}` | Remove the item and its reading progress |
+| GET | `/reading/{bookId}` | Progress, or an empty view with `exists: false` |
+| PUT | `/reading/{bookId}` | Save page/percentage/dates/notes |
 
-## Reading progress
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/reading/{bookId}` | Get progress |
-| PUT | `/reading/{bookId}` | Upsert page/percentage/dates/notes |
+Rules (all in `LibraryService`): status `READING` sets `startedAt`; status `READ` sets `completedAt`, 100% and the
+last page; the first progress save moves `WANT_TO_READ` (or a book not on the shelf) to `READING`; progress at 100%
+moves the book to `READ`. The percentage follows the page when the page count is known.
 
 ## Documents and RAG
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/documents` | Multipart upload + ingest |
-| GET | `/documents` | Current user's documents |
-| GET | `/documents/{id}` | Document status |
-| DELETE | `/documents/{id}` | Delete private file + vector rows |
-| POST | `/documents/{id}/chat` | Tenant-filtered RAG chat |
+| POST | `/documents?bookId=` | Multipart upload; with `bookId` the book goes on the shelf as `READING` |
+| GET | `/documents` | Current user's documents (`failureReason` + safe `errorMessage` when `FAILED`) |
+| GET | `/documents/{id}` | One document |
+| POST | `/documents/{id}/reingest` | Index again (after a failure or an embedding change) |
+| DELETE | `/documents/{id}` | Delete vectors and row; the file is removed after commit |
+| POST | `/documents/{id}/chat` | Tenant-filtered RAG answer with sources (`label, source, documentId, chunkIndex, score, snippet`) |
 
-## AI assistant
+Limits: 25 MB per file; 50 documents and 500 MB per user; 2 M extracted characters per document.
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/ai/assistant` | ChatClient + tool calling |
-| GET | `/ai/usage` | User AI request summary |
-
-## Recommendations / dashboard
+## AI assistant, recommendations, dashboard
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/recommendations?limit=12` | Rule + similarity recommendations: `[{book, score, reasons[]}]` |
-| GET | `/dashboard` | Status counts, favorites, pages, progress on current reads, average rating, completed this year, currently reading |
-
-Recommendations exclude every book already on the user's shelf (and other editions of it). Reasons are human-readable,
-for example `More from Frank Herbert` or `Matches your interest in Science fiction`.
-
-## Library ↔ reading progress
-
-- Moving a book to `READING` sets `startedAt` (if empty).
-- Moving a book to `READ` sets `completedAt` (if empty), `percentage = 100` and `currentPage = pageCount` when known.
-- `PUT /reading/{bookId}` derives `percentage` from `currentPage` when the book has a page count, rejects pages beyond
-  the page count and `completedAt` before `startedAt`.
+| POST | `/ai/assistant` | `{message, history[≤ 20 turns]}`; tool calling over the user's shelf |
+| GET | `/ai/usage` | Last 30 days, with breakdowns by model and operation |
+| GET | `/recommendations?limit=` | `[{book, score, reasons[]}]`; excludes books already on the shelf |
+| GET | `/dashboard` | Status counts, favorites, progress, rating, completed this year, currently reading, recent activity |
 
 ## Admin
 
-Requires the `ADMIN` role. Accounts listed in `APP_ADMIN_EMAILS` are promoted on registration and at startup.
+Requires the `ADMIN` role (`APP_ADMIN_EMAILS`).
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/admin/books/reindex` | Re-embed every local book (after enabling AI or changing the embedding model) |
+| POST | `/admin/books/reindex` | Re-embed every local book |
 
 ## Error envelope
 
-Every error — including 401/403 from the security layer — uses the same shape:
+Every error — including 401/403 from the security layer — uses the same body. `requestId` matches the
+`X-Request-Id` response header and the server logs.
 
 ```json
 {
   "code": "BOOK_NOT_FOUND",
   "message": "Book not found",
-  "timestamp": "2026-09-29T14:00:00Z",
-  "path": "/api/books/..."
+  "timestamp": "2026-09-30T14:00:00Z",
+  "path": "/api/books/…",
+  "requestId": "5fe0b4c4-818c-49b1-be10-b26bb87b2fc4"
 }
 ```
 
+Codes come from `ErrorCode.java`:
+
 | HTTP | Codes |
 |---|---|
-| 400 | `VALIDATION_ERROR`, `MALFORMED_REQUEST`, `AI_DISABLED`, `DOCUMENT_NOT_READY`, `NO_BOOK_DOCUMENTS`, `NO_SUMMARY_SOURCE`, `UNSUPPORTED_FILE_TYPE`, `EMPTY_FILE`, `FILE_TOO_LARGE`, `PROVIDER_UNAVAILABLE` |
-| 401 | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN` |
+| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `UNSUPPORTED_FILE_TYPE`, `EMPTY_FILE`, `TOO_LARGE_AFTER_EXTRACTION`, `DOCUMENT_NOT_READY`, `NO_BOOK_DOCUMENTS`, `NO_SUMMARY_SOURCE`, `PROVIDER_UNAVAILABLE`, `WRONG_PASSWORD`, `QUOTA_EXCEEDED` |
+| 401 | `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN` |
 | 403 | `FORBIDDEN` |
-| 404 | `BOOK_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `LIBRARY_ITEM_NOT_FOUND`, `READING_PROGRESS_NOT_FOUND`, `EXTERNAL_BOOK_NOT_FOUND`, `USER_NOT_FOUND`, `NOT_FOUND` |
-| 409 | `EMAIL_ALREADY_REGISTERED`, `BOOK_ALREADY_EXISTS` |
-| 413 | `FILE_TOO_LARGE` (multipart limit) |
-| 429 | `RATE_LIMITED` |
+| 404 | `NOT_FOUND`, `BOOK_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `LIBRARY_ITEM_NOT_FOUND`, `EXTERNAL_BOOK_NOT_FOUND`, `USER_NOT_FOUND` |
+| 405 | `METHOD_NOT_ALLOWED` |
+| 409 | `CONFLICT`, `EMAIL_TAKEN`, `BOOK_ALREADY_EXISTS`, `ALREADY_IN_LIBRARY` |
+| 413 | `FILE_TOO_LARGE` |
+| 429 | `RATE_LIMITED`, `AI_RATE_LIMITED` |
 | 500 | `INTERNAL_ERROR` |
+| 502 | `AI_PROVIDER_ERROR` |
+| 503 | `AI_DISABLED`, `VECTOR_DISABLED` |
+| 504 | `AI_TIMEOUT` |

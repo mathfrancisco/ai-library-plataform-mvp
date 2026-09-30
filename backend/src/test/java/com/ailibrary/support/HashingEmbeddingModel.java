@@ -1,14 +1,13 @@
 package com.ailibrary.support;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 
 /** Deterministic bag-of-words embedding for retrieval tests; no provider or network needed. */
 public class HashingEmbeddingModel implements EmbeddingModel {
@@ -25,7 +24,8 @@ public class HashingEmbeddingModel implements EmbeddingModel {
     @Override
     public EmbeddingResponse call(EmbeddingRequest request) {
         List<Embedding> out = new ArrayList<>();
-        for (int i = 0; i < request.getInstructions().size(); i++) out.add(new Embedding(vector(request.getInstructions().get(i), dimensions), i));
+        for (int i = 0; i < request.getInstructions().size(); i++)
+            out.add(new Embedding(vector(request.getInstructions().get(i), dimensions), i));
         return new EmbeddingResponse(out);
     }
 

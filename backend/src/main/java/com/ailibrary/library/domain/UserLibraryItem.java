@@ -1,11 +1,10 @@
 package com.ailibrary.library.domain;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "user_library", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "book_id"}))
@@ -32,6 +31,9 @@ public class UserLibraryItem {
     @Column(name = "added_at", nullable = false, updatable = false)
     private Instant addedAt = Instant.now();
 
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt = Instant.now();
+
     protected UserLibraryItem() {}
 
     public UserLibraryItem(UUID userId, UUID bookId, LibraryStatus status) {
@@ -41,17 +43,43 @@ public class UserLibraryItem {
         this.status = status;
     }
 
-    public UUID getId() { return id; }
-    public UUID getUserId() { return userId; }
-    public UUID getBookId() { return bookId; }
-    public LibraryStatus getStatus() { return status; }
-    public boolean isFavorite() { return favorite; }
-    public Integer getRating() { return rating; }
-    public Instant getAddedAt() { return addedAt; }
+    public UUID getId() {
+        return id;
+    }
 
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public UUID getBookId() {
+        return bookId;
+    }
+
+    public LibraryStatus getStatus() {
+        return status;
+    }
+
+    public boolean isFavorite() {
+        return favorite;
+    }
+
+    public Integer getRating() {
+        return rating;
+    }
+
+    public Instant getAddedAt() {
+        return addedAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    /** Null means "leave unchanged"; a rating of 0 clears the rating. */
     public void update(LibraryStatus status, Boolean favorite, Integer rating) {
         if (status != null) this.status = status;
         if (favorite != null) this.favorite = favorite;
-        if (rating != null) this.rating = rating;
+        if (rating != null) this.rating = rating == 0 ? null : rating;
+        this.updatedAt = Instant.now();
     }
 }

@@ -1,6 +1,16 @@
 # Scope: MVP, V2 and V3
 
-## MVP — implemented/scaffolded in this repository
+## MVP — implemented in this repository
+
+Every MVP item below is implemented (status per feature in [09-feature-matrix.md](09-feature-matrix.md)).
+Items that changed or moved while implementing [`docs/specs`](specs/README.md):
+
+- **Full summary type removed.** Summaries are `TLDR`, `SHORT` and `TAKEAWAYS`; a "full" summary from a catalog description
+  added nothing (SPEC-04 §10.7).
+- **Chat provider is Groq, embeddings are local ONNX** (ADR-004). Search, recommendations and document
+  ingestion work without an AI key.
+- **Search page** is merged into Explore (`/search` redirects to `/explore`).
+- **Playwright end-to-end tests** and a provider-backed AI evaluation workflow moved to V2.
 
 ### Identity
 - Sign up, sign in, access JWT, rotating refresh token, logout.
@@ -22,7 +32,8 @@
 - Local PostgreSQL full-text search.
 - External provider search.
 - Semantic search over locally indexed book metadata.
-- Hybrid merge/ranking with deterministic source weights and deduplication.
+- Hybrid merge/ranking with deterministic source weights and deduplication; branches run in parallel and a slow
+  branch degrades instead of failing.
 
 ### Documents + RAG
 - PDF, EPUB, TXT, Markdown upload.
@@ -31,12 +42,14 @@
 - Spring AI token-aware chunking.
 - pgvector storage with owner/document metadata.
 - Tenant-filtered retrieval.
-- Chat answer + retrieved source snippets.
+- Chat answer + retrieved source snippets with checked `[S1]` citations.
+- Book chat over all ready documents linked to one book.
+- Per-user quotas (50 documents, 500 MB).
 
 ### AI
-- Summary generation with prompt-hash cache.
+- Summary generation (`TLDR`, `SHORT`, `TAKEAWAYS`) with prompt-hash cache.
 - Natural-language discovery/query rewriting.
-- Spring AI ChatClient.
+- Spring AI ChatClient on Groq with `FAST`/`SMART` model tiers, per-user and global rate limits.
 - Tool calling for read-only personal-library actions plus safe write action to add an existing local book.
 - Provider/model/latency/request outcome logging.
 
@@ -45,15 +58,18 @@
 - Vector similarity for local books when embeddings are available.
 
 ### Frontend
-- Landing, Explore, Search, Book detail, Library, AI assistant, Document chat, Dashboard, Settings.
+- Landing, Explore (with search and AI discovery), Book detail, Library, AI assistant, Documents + document chat,
+  Dashboard, Settings (profile, password, account deletion).
+- Loading/empty/error states, toasts, protected routes with `?next=` redirect.
 - Responsive shell and reusable components.
 
 ### Platform
-- Docker Compose.
+- Docker Compose (healthchecks, works without `.env`), non-root images.
 - Flyway.
-- GitHub Actions.
-- Backend unit/integration test foundation.
-- Frontend unit test foundation.
+- GitHub Actions: tests, lint/format, image build + Trivy scan, compose smoke test; CodeQL; Dependabot.
+- Backend unit tests and Testcontainers integration tests (`*IT`).
+- Frontend Vitest + MSW tests.
+- OpenAPI via springdoc (disabled in `prod`).
 
 ## V2
 
@@ -63,7 +79,10 @@
 - Server-Sent Events streaming chat.
 - Google/GitHub OAuth.
 - Rich reading sessions/analytics and yearly goals.
-- RAG evaluation dataset and automated regression metrics.
+- RAG evaluation dataset and automated regression metrics (provider-backed, opt-in workflow).
+- Playwright end-to-end tests.
+- Refresh token in an `httpOnly` cookie; nonce-based CSP.
+- S3-compatible upload storage and shared (Redis) rate limits for more than one backend instance.
 - Reranking when retrieval corpus size/quality justifies it.
 - Gutenberg OPDS/public-domain importer workflow.
 

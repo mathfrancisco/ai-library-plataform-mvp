@@ -1,20 +1,19 @@
 package com.ailibrary.recommendation;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.ailibrary.book.domain.Book;
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.vector.VectorStoreAccess;
 import com.ailibrary.library.domain.LibraryStatus;
 import com.ailibrary.library.domain.UserLibraryItem;
 import com.ailibrary.library.repository.UserLibraryRepository;
+import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-
-import java.util.*;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class RecommendationServiceTest {
     private final UserLibraryRepository library = mock(UserLibraryRepository.class);
@@ -54,7 +53,8 @@ class RecommendationServiceTest {
     void coldStartReturnsRecentBooks() {
         when(library.findByUserIdOrderByAddedAtDesc(user)).thenReturn(List.of());
         when(books.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(book("New", "A", null, null))));
-        assertThat(service.forUser(user, 3)).singleElement().satisfies(r -> assertThat(r.reasons()).containsExactly("Recently added to the catalog"));
+        assertThat(service.forUser(user, 3)).singleElement().satisfies(r -> assertThat(r.reasons())
+                .containsExactly("Recently added to the catalog"));
     }
 
     @Test
@@ -62,7 +62,11 @@ class RecommendationServiceTest {
         UserLibraryItem low = new UserLibraryItem(user, UUID.randomUUID(), LibraryStatus.READ);
         low.update(null, null, 1);
         assertThat(RecommendationService.seedWeight(low)).isZero();
-        assertThat(RecommendationService.seedWeight(new UserLibraryItem(user, UUID.randomUUID(), LibraryStatus.DROPPED))).isZero();
-        assertThat(RecommendationService.seedWeight(new UserLibraryItem(user, UUID.randomUUID(), LibraryStatus.READING))).isEqualTo(1.0);
+        assertThat(RecommendationService.seedWeight(
+                        new UserLibraryItem(user, UUID.randomUUID(), LibraryStatus.DROPPED)))
+                .isZero();
+        assertThat(RecommendationService.seedWeight(
+                        new UserLibraryItem(user, UUID.randomUUID(), LibraryStatus.READING)))
+                .isEqualTo(1.0);
     }
 }

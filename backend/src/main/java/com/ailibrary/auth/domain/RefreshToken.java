@@ -1,7 +1,6 @@
 package com.ailibrary.auth.domain;
 
 import jakarta.persistence.*;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -32,11 +31,31 @@ public class RefreshToken {
         this.expiresAt = expiresAt;
     }
 
-    public UUID getId() { return id; }
-    public UUID getUserId() { return userId; }
-    public String getTokenHash() { return tokenHash; }
-    public Instant getExpiresAt() { return expiresAt; }
-    public Instant getRevokedAt() { return revokedAt; }
-    public boolean isUsable() { return revokedAt == null && expiresAt.isAfter(Instant.now()); }
-    public void revoke() { this.revokedAt = Instant.now(); }
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public String getTokenHash() {
+        return tokenHash;
+    }
+
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public Instant getRevokedAt() {
+        return revokedAt;
+    }
+
+    public boolean isUsable() {
+        return revokedAt == null && expiresAt.isAfter(Instant.now());
+    }
+
+    public void revoke() {
+        this.revokedAt = Instant.now();
+    }
 }

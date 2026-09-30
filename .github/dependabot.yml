@@ -3,9 +3,28 @@ updates:
   - package-ecosystem: maven
     directory: /backend
     schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      spring:
+        patterns: ["org.springframework*", "io.spring*"]
+      testing:
+        patterns: ["org.testcontainers*", "org.junit*", "org.mockito*", "org.assertj*"]
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      next-react:
+        patterns: ["next", "react", "react-dom", "eslint-config-next", "@types/react*"]
+      testing:
+        patterns: ["vitest", "@testing-library/*", "msw", "jsdom"]
   - package-ecosystem: github-actions
     directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /backend
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /frontend
     schedule: { interval: weekly }

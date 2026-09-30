@@ -1,7 +1,6 @@
 package com.ailibrary.book.domain;
 
 import jakarta.persistence.*;
-
 import java.util.UUID;
 
 @Entity
@@ -32,9 +31,23 @@ public class ExternalBookReference {
         this.sourceUrl = sourceUrl;
     }
 
-    public UUID getId() { return id; }
-    public UUID getBookId() { return bookId; }
-    public String getProvider() { return provider; }
-    public String getExternalId() { return externalId; }
-    public String getSourceUrl() { return sourceUrl; }
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getBookId() {
+        return bookId;
+    }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
 }

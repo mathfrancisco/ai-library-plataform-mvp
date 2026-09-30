@@ -7,18 +7,20 @@ import com.ailibrary.library.domain.UserLibraryItem;
 import com.ailibrary.library.repository.UserLibraryRepository;
 import com.ailibrary.reading.domain.ReadingProgress;
 import com.ailibrary.reading.repository.ReadingProgressRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DashboardService {
+    static final int RECENT_ACTIVITY = 5;
+
     private final UserLibraryRepository library;
     private final ReadingProgressRepository progress;
     private final BookRepository books;
@@ -29,51 +31,123 @@ public class DashboardService {
         this(library, progress, books, Clock.systemUTC());
     }
 
-    DashboardService(UserLibraryRepository library, ReadingProgressRepository progress, BookRepository books, Clock clock) {
+    DashboardService(
+            UserLibraryRepository library, ReadingProgressRepository progress, BookRepository books, Clock clock) {
         this.library = library;
         this.progress = progress;
         this.books = books;
         this.clock = clock;
     }
 
-    public record CurrentlyReading(UUID bookId, String title, String coverUrl, int currentPage, Integer pageCount, double percentage) {}
+    public record CurrentlyReading(
+            UUID bookId, String title, String coverUrl, int currentPage, Integer pageCount, double percentage) {}
 
-    public record Dashboard(long totalBooks, long wantToRead, long reading, long read, long dropped, long favorites,
-                            long pagesTracked, double averageProgress, Double averageRating, long completedThisYear,
-                            List<CurrentlyReading> currentlyReading) {}
+    public record Dashboard(
+            long totalBooks,
+            long wantToRead,
+            long reading,
+            long read,
+            long dropped,
+            long favorites,
+            long pagesTracked,
+            double averageProgress,
+            Double averageRating,
+            long completedThisYear,
+            List<CurrentlyReading> currentlyReading,
+            List<RecentActivity> recentActivity) {}
+
+    public record RecentActivity(
+            UUID bookId, String title, LibraryStatus status, double percentage, Instant updatedAt) {}
 
     @Transactional(readOnly = true)
     public Dashboard get(UUID userId) {
         List<UserLibraryItem> items = library.findByUserIdOrderByAddedAtDesc(userId);
+        Set<UUID> shelved = items.stream().map(UserLibraryItem::getBookId).collect(Collectors.toSet());
+        // Only progress for books still on the shelf counts (SPEC-04 §12.9d).
         Map<UUID, ReadingProgress> progressByBook = progress.findByUserId(userId).stream()
+                .filter(p -> shelved.contains(p.getBookId()))
                 .collect(Collectors.toMap(ReadingProgress::getBookId, Function.identity(), (a, b) -> a));
         Map<LibraryStatus, Long> byStatus = items.stream()
-                .collect(Collectors.groupingBy(UserLibraryItem::getStatus, () -> new EnumMap<>(LibraryStatus.class), Collectors.counting()));
+                .collect(Collectors.groupingBy(
+                        UserLibraryItem::getStatus, () -> new EnumMap<>(LibraryStatus.class), Collectors.counting()));
 
-        long pages = progressByBook.values().stream().mapToLong(ReadingProgress::getCurrentPage).sum();
-        OptionalDouble rating = items.stream().filter(i -> i.getRating() != null).mapToInt(UserLibraryItem::getRating).average();
+        long pages = progressByBook.values().stream()
+                .mapToLong(ReadingProgress::getCurrentPage)
+                .sum();
+        OptionalDouble rating = items.stream()
+                .filter(i -> i.getRating() != null)
+                .mapToInt(UserLibraryItem::getRating)
+                .average();
         int year = LocalDate.now(clock).getYear();
         long completedThisYear = progressByBook.values().stream()
-                .filter(p -> p.getCompletedAt() != null && p.getCompletedAt().getYear() == year).count();
+                .filter(p -> p.getCompletedAt() != null && p.getCompletedAt().getYear() == year)
+                .count();
 
-        List<UUID> readingIds = items.stream().filter(i -> i.getStatus() == LibraryStatus.READING).map(UserLibraryItem::getBookId).toList();
+        List<UUID> readingIds = items.stream()
+                .filter(i -> i.getStatus() == LibraryStatus.READING)
+                .map(UserLibraryItem::getBookId)
+                .toList();
+        List<UserLibraryItem> recentItems = items.stream()
+                .sorted(Comparator.comparing((UserLibraryItem i) -> lastActivity(i, progressByBook.get(i.getBookId())))
+                        .reversed())
+                .limit(RECENT_ACTIVITY)
+                .toList();
+        Set<UUID> needed = new HashSet<>(readingIds);
+        recentItems.forEach(i -> needed.add(i.getBookId()));
         Map<UUID, Book> readingBooks = new HashMap<>();
-        books.findAllById(readingIds).forEach(b -> readingBooks.put(b.getId(), b));
-        List<CurrentlyReading> current = readingIds.stream().map(readingBooks::get).filter(Objects::nonNull).map(b -> {
-            ReadingProgress p = progressByBook.get(b.getId());
-            return new CurrentlyReading(b.getId(), b.getTitle(), b.getCoverUrl(), p == null ? 0 : p.getCurrentPage(), b.getPageCount(),
-                    p == null || p.getPercentage() == null ? 0 : p.getPercentage().doubleValue());
-        }).toList();
-        double averageProgress = current.stream().mapToDouble(CurrentlyReading::percentage).average().orElse(0);
+        books.findAllById(needed).forEach(b -> readingBooks.put(b.getId(), b));
+        List<CurrentlyReading> current = readingIds.stream()
+                .map(readingBooks::get)
+                .filter(Objects::nonNull)
+                .map(b -> {
+                    ReadingProgress p = progressByBook.get(b.getId());
+                    return new CurrentlyReading(
+                            b.getId(),
+                            b.getTitle(),
+                            b.getCoverUrl(),
+                            p == null ? 0 : p.getCurrentPage(),
+                            b.getPageCount(),
+                            p == null || p.getPercentage() == null
+                                    ? 0
+                                    : p.getPercentage().doubleValue());
+                })
+                .toList();
+        double averageProgress = current.stream()
+                .mapToDouble(CurrentlyReading::percentage)
+                .average()
+                .orElse(0);
 
-        return new Dashboard(items.size(),
+        return new Dashboard(
+                items.size(),
                 byStatus.getOrDefault(LibraryStatus.WANT_TO_READ, 0L),
                 byStatus.getOrDefault(LibraryStatus.READING, 0L),
                 byStatus.getOrDefault(LibraryStatus.READ, 0L),
                 byStatus.getOrDefault(LibraryStatus.DROPPED, 0L),
                 items.stream().filter(UserLibraryItem::isFavorite).count(),
-                pages, averageProgress,
+                pages,
+                averageProgress,
                 rating.isPresent() ? Math.round(rating.getAsDouble() * 10) / 10.0 : null,
-                completedThisYear, current);
+                completedThisYear,
+                current,
+                recentItems.stream()
+                        .filter(i -> readingBooks.containsKey(i.getBookId()))
+                        .map(i -> {
+                            ReadingProgress p = progressByBook.get(i.getBookId());
+                            return new RecentActivity(
+                                    i.getBookId(),
+                                    readingBooks.get(i.getBookId()).getTitle(),
+                                    i.getStatus(),
+                                    p == null || p.getPercentage() == null
+                                            ? 0
+                                            : p.getPercentage().doubleValue(),
+                                    lastActivity(i, p));
+                        })
+                        .toList());
+    }
+
+    private static Instant lastActivity(UserLibraryItem item, ReadingProgress progress) {
+        Instant shelf = item.getUpdatedAt() == null ? item.getAddedAt() : item.getUpdatedAt();
+        if (progress == null || progress.getUpdatedAt() == null) return shelf;
+        return progress.getUpdatedAt().isAfter(shelf) ? progress.getUpdatedAt() : shelf;
     }
 }

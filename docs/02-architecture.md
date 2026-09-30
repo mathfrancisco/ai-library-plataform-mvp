@@ -5,7 +5,7 @@
 ```mermaid
 flowchart TB
   U[Browser / User]
-  FE[Next.js 16 App Router\nReact 19 + TanStack Query]
+  FE[Next.js 16 App Router\nReact 19 + TanStack Query\n/api proxy]
   API[Spring Boot 4.1 Modular Monolith]
 
   subgraph Modules[Backend domain modules]
@@ -27,10 +27,11 @@ flowchart TB
   OL[Open Library]
   GB[Google Books]
   PG[Project Gutenberg / OPDS\nV2]
-  LLM[LLM / Embedding provider\nvia Spring AI]
+  LLM[Groq chat\nvia Spring AI OpenAI starter]
+  EMB[Local ONNX embeddings\nall-MiniLM-L6-v2, in-process]
 
-  U --> FE
-  FE -->|REST / JSON + JWT| API
+  U -->|same origin /api/*| FE
+  FE -->|proxy, REST / JSON + JWT| API
   API --> Modules
   AUTH --> DB
   BOOK --> DB
@@ -40,6 +41,8 @@ flowchart TB
   SEARCH --> VEC
   DOC --> FS
   DOC --> VEC
+  DOC --> EMB
+  SEARCH --> EMB
   RAG --> VEC
   RAG --> LLM
   AI --> LLM
@@ -91,8 +94,12 @@ sequenceDiagram
     Catalog->>OL: /search.json
   end
   Hybrid->>Hybrid: normalize + dedupe + weighted merge
-  Hybrid-->>UI: ranked SearchResult[]
+  Hybrid-->>UI: SearchResponse {results, degraded, providers}
 ```
+
+The three branches run in parallel on virtual threads with per-branch timeouts (lexical 2 s, semantic 2 s,
+external 3 s). A branch that fails or times out is listed in `degraded`; each external provider reports `ok` in
+`providers`. External results are cached for 5 minutes only when every provider answered.
 
 ### Document RAG
 
@@ -113,6 +120,16 @@ sequenceDiagram
   API-->>User: answer + source snippets
 ```
 
+## Rules that hold across modules
+
+- **No network or model call inside `@Transactional`.** LLM calls, embedding computation and catalog requests run
+  outside transactions; writes around them use short transactions (for example catalog import, summaries,
+  ingestion). AI request logs are written with `REQUIRES_NEW` so a failed request is still recorded.
+- **Every private query is owner-scoped.** Controllers never take an owner id from the client; vector filters for
+  private chunks always include `ownerId` (`VectorFilters`).
+- **Rules that span modules have one home.** Shelf status ↔ reading progress rules live in `LibraryService`.
+- **Errors use one envelope** (`ApiError` with an `ErrorCode`), including 401/403 from the security layer.
+
 ## Deployment shape
 
 The MVP has exactly three runtime containers:
@@ -121,4 +138,6 @@ The MVP has exactly three runtime containers:
 2. `backend`
 3. `postgres` with pgvector
 
-Uploaded source files live in a Docker volume for local development. Production should replace this with object storage (S3-compatible) without changing the document module contract.
+The browser only talks to the frontend origin: `src/proxy.ts` forwards `/api/*` to `API_INTERNAL_URL` at runtime, so
+no CORS is needed in the default setup. Uploaded source files and the embedding model cache live in Docker volumes
+for local development. Production should replace this with object storage (S3-compatible) without changing the document module contract.

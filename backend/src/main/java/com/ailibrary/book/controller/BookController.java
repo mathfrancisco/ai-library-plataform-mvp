@@ -2,30 +2,36 @@ package com.ailibrary.book.controller;
 
 import com.ailibrary.book.dto.BookView;
 import com.ailibrary.book.dto.CreateBookRequest;
-import jakarta.validation.Valid;
 import com.ailibrary.book.service.BookService;
-import org.springframework.web.bind.annotation.*;
-
+import com.ailibrary.book.service.SimilarBookService;
+import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/books")
 public class BookController {
     private final BookService books;
-    private final com.ailibrary.book.service.SimilarBookService similar;
+    private final SimilarBookService similar;
 
-    public BookController(BookService books, com.ailibrary.book.service.SimilarBookService similar) {
+    public BookController(BookService books, SimilarBookService similar) {
         this.books = books;
         this.similar = similar;
     }
 
+    /** 201 with the new book, or 200 with the existing record when the book is already in the catalog. */
     @PostMapping
-    public BookView create(@Valid @RequestBody CreateBookRequest request) {
-        return books.create(request);
+    public ResponseEntity<BookView> create(@Valid @RequestBody CreateBookRequest request) {
+        BookService.Created result = books.create(request);
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(result.book());
     }
 
     @GetMapping("/{id}/similar")
-    public java.util.List<BookView> similar(@PathVariable UUID id, @RequestParam(defaultValue="8") int limit) {
+    public List<BookView> similar(@PathVariable UUID id, @RequestParam(defaultValue = "8") int limit) {
         return similar.similar(id, Math.max(1, Math.min(limit, 24)));
     }
 

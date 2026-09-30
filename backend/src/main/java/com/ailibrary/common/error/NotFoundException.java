@@ -1,16 +1,19 @@
 package com.ailibrary.common.error;
 
-import org.springframework.http.HttpStatus;
-
 public class NotFoundException extends ApiException {
     public NotFoundException(String message) {
-        this("NOT_FOUND", message);
+        this(ErrorCode.NOT_FOUND, message);
     }
 
-    public NotFoundException(String code, String message) {
-        super(HttpStatus.NOT_FOUND, code, message);
+    public NotFoundException(ErrorCode code, String message) {
+        super(code, message);
     }
 
-    public static NotFoundException book() { return new NotFoundException("BOOK_NOT_FOUND", "Book not found"); }
-    public static NotFoundException document() { return new NotFoundException("DOCUMENT_NOT_FOUND", "Document not found"); }
+    public static NotFoundException book() {
+        return new NotFoundException(ErrorCode.BOOK_NOT_FOUND, "Book not found");
+    }
+
+    public static NotFoundException document() {
+        return new NotFoundException(ErrorCode.DOCUMENT_NOT_FOUND, "Document not found");
+    }
 }

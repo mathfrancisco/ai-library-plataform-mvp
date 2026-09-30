@@ -33,6 +33,6 @@ AI Library is a digital library layer that federates public book catalogs, store
 - Add an external catalog item to `Want to read`.
 - Upload PDF/EPUB/TXT/Markdown content.
 - Ask `What does this document say about hexagonal architecture?` and receive cited chunks.
-- Generate a short/full/TL;DR summary once and reuse the cached result.
+- Generate a TL;DR, short or key-takeaways summary once and reuse the cached result.
 - Receive related-book recommendations based on metadata + embeddings.
 - Ask the assistant `What am I currently reading?` through tool calling.

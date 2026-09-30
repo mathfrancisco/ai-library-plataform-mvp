@@ -1,5 +1,11 @@
 package com.ailibrary.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
 import com.ailibrary.auth.domain.RefreshToken;
 import com.ailibrary.auth.domain.User;
 import com.ailibrary.auth.dto.AuthDtos.*;
@@ -9,24 +15,17 @@ import com.ailibrary.auth.service.AuthService;
 import com.ailibrary.common.error.ApiException;
 import com.ailibrary.common.security.AuthProperties;
 import com.ailibrary.common.security.JwtService;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
-
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
 
 class AuthServiceTest {
     private final UserRepository users = mock(UserRepository.class);
@@ -40,8 +39,14 @@ class AuthServiceTest {
     void setUp() {
         service = new AuthService(users, tokens, NoOpPasswordEncoder.getInstance(), new JwtService(props), props);
         when(users.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(tokens.save(any())).thenAnswer(i -> { RefreshToken t = i.getArgument(0); stored.put(t.getTokenHash(), t); return t; });
-        when(tokens.findByTokenHash(anyString())).thenAnswer(i -> Optional.ofNullable(stored.get(i.<String>getArgument(0))));
+        when(users.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+        when(tokens.save(any())).thenAnswer(i -> {
+            RefreshToken t = i.getArgument(0);
+            stored.put(t.getTokenHash(), t);
+            return t;
+        });
+        when(tokens.findByTokenHash(anyString()))
+                .thenAnswer(i -> Optional.ofNullable(stored.get(i.<String>getArgument(0))));
     }
 
     @Test
@@ -56,6 +61,7 @@ class AuthServiceTest {
         assertThat(rotated.refreshToken()).isNotEqualTo(registered.refreshToken());
         assertThat(stored.get(sha256(registered.refreshToken())).getRevokedAt()).isNotNull();
 
+        // Reusing a rotated token is treated as theft: every session of the user is revoked.
         assertThatThrownBy(() -> service.refresh(new RefreshRequest(registered.refreshToken())))
                 .isInstanceOf(ApiException.class)
                 .satisfies(e -> assertThat(((ApiException) e).status()).isEqualTo(HttpStatus.UNAUTHORIZED));
@@ -72,7 +78,7 @@ class AuthServiceTest {
     void duplicateEmailAndBadPasswordAreRejected() {
         when(users.existsByEmailIgnoreCase("a@b.co")).thenReturn(true);
         assertThatThrownBy(() -> service.register(new RegisterRequest("a@b.co", "password1", "A")))
-                .satisfies(e -> assertThat(((ApiException) e).code()).isEqualTo("EMAIL_ALREADY_REGISTERED"));
+                .satisfies(e -> assertThat(((ApiException) e).code()).isEqualTo("EMAIL_TAKEN"));
         when(users.findByEmailIgnoreCase("x@y.co")).thenReturn(Optional.of(new User("x@y.co", "right", "X")));
         assertThatThrownBy(() -> service.login(new LoginRequest("x@y.co", "wrong")))
                 .satisfies(e -> assertThat(((ApiException) e).code()).isEqualTo("INVALID_CREDENTIALS"));
@@ -81,6 +87,7 @@ class AuthServiceTest {
     }
 
     private static String sha256(String v) throws Exception {
-        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));
+        return HexFormat.of()
+                .formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));
     }
 }

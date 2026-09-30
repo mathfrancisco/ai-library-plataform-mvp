@@ -1,9 +1,8 @@
 package com.ailibrary.recommendation;
 
 import com.ailibrary.common.security.CurrentUser;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/recommendations")

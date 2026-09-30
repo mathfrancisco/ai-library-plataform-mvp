@@ -5,6 +5,10 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ailibrary}
     username: ${SPRING_DATASOURCE_USERNAME:ailibrary}
     password: ${SPRING_DATASOURCE_PASSWORD:ailibrary}
+    hikari:
+      # Tenant-filtered HNSW search needs iterative scans (pgvector >= 0.8). Set per connection because
+      # pooled connections can predate the ALTER DATABASE in V3. Older pgvector ignores the placeholder.
+      connection-init-sql: SET hnsw.iterative_scan = relaxed_order
   jpa:
     open-in-view: false
     hibernate:
@@ -20,52 +24,103 @@ spring:
       max-file-size: 25MB
       max-request-size: 25MB
   ai:
+    model:
+      chat: openai # Groq through its OpenAI-compatible API
+      embedding: transformers # local ONNX, no key
     openai:
-      api-key: ${OPENAI_API_KEY:disabled}
-      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${GROQ_API_KEY:disabled}
+      # The OpenAI SDK used by Spring AI 2.0 expects the versioned base path.
+      base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
       chat:
         options:
-          model: ${OPENAI_CHAT_MODEL:gpt-4.1-mini}
+          model: ${AI_MODEL_SMART:llama-3.3-70b-versatile}
           temperature: 0.2
-      embedding:
-        options:
-          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+          timeout: ${AI_TIMEOUT:PT45S}
+          max-retries: 1
+    embedding:
+      transformer:
+        cache:
+          directory: ${AI_EMBEDDING_CACHE_DIR:${java.io.tmpdir}/spring-ai-onnx}
     vectorstore:
       pgvector:
         initialize-schema: false
         index-type: HNSW
         distance-type: COSINE_DISTANCE
-        dimensions: ${AI_EMBEDDING_DIMENSIONS:1536}
+        dimensions: ${AI_EMBEDDING_DIMENSIONS:384}
+
+# OpenAPI (docs/04-api-contract.md links here): /v3/api-docs and /swagger-ui.html; disabled in the prod profile.
+springdoc:
+  api-docs:
+    enabled: ${APP_API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${APP_API_DOCS_ENABLED:true}
+  paths-to-match: /api/**
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        # metrics/prometheus are opt-in (MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE) and require ROLE_ADMIN.
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info}
   endpoint:
     health:
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db
 
 server:
   error:
     include-message: never
+  tomcat:
+    # Read (and discard) bodies slightly over the 25 MB upload limit so clients get the 413 FILE_TOO_LARGE
+    # response instead of a reset connection.
+    max-swallow-size: 30MB
+  # Behind a reverse proxy, trust X-Forwarded-* so client IPs (rate limits) and URLs are correct.
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
 
 app:
   ai:
     enabled: ${AI_ENABLED:false}
-    provider: openai-compatible
-    model: ${OPENAI_CHAT_MODEL:gpt-4.1-mini}
-    max-requests-per-minute: ${AI_MAX_REQUESTS_PER_MINUTE:30}
+    provider: groq
+    models:
+      fast: ${AI_MODEL_FAST:llama-3.1-8b-instant}
+      smart: ${AI_MODEL_SMART:llama-3.3-70b-versatile}
+    rate-limit-per-minute: ${AI_RATE_LIMIT_PER_MINUTE:20}
+    global-rate-per-minute: ${AI_GLOBAL_RATE_PER_MINUTE:25}
+  vector:
+    # Embeddings run locally, so vector features do not depend on AI_ENABLED.
+    enabled: ${VECTOR_ENABLED:true}
   auth:
-    jwt-secret: ${JWT_SECRET:change-me-with-at-least-32-characters-long-secret}
+    jwt-secret: ${JWT_SECRET:change-me-with-at-least-32-characters-long-secret} # rejected in the prod profile
     access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:15}
     refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:30}
-    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    cors-allowed-origins: ${APP_CORS_ORIGINS:http://localhost:3000}
     admin-emails: ${APP_ADMIN_EMAILS:}
   upload:
     dir: ${APP_UPLOAD_DIR:./uploads}
     max-bytes: 26214400
+    max-documents-per-user: ${APP_MAX_DOCUMENTS_PER_USER:50}
+    max-bytes-per-user: ${APP_MAX_BYTES_PER_USER:524288000}
+    max-extracted-chars: 2000000
+  # Similarity thresholds are cosine similarity for all-MiniLM-L6-v2.
+  search:
+    semantic-threshold: 0.30
+    lexical-timeout: PT2S
+    semantic-timeout: PT2S
+    external-timeout: PT3S
+  rag:
+    document-top-k: 6
+    book-top-k: 8
+    similarity-threshold: 0.30
+    max-context-tokens: 4000
+  recommendation:
+    similarity-threshold: 0.30
+  rate-limit:
+    auth-per-minute: 10
+    anonymous-search-per-minute: 30
+    user-search-per-minute: 120
   catalog:
     open-library:
       user-agent: "${OPEN_LIBRARY_USER_AGENT:AILibraryPortfolio/0.1 (contact: replace@example.com)}"

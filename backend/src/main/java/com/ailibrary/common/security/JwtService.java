@@ -1,17 +1,18 @@
 package com.ailibrary.common.security;
 
 import com.ailibrary.auth.domain.User;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-
 @Service
 public class JwtService {
+    static final String ISSUER = "ai-library";
+
     private final JwtEncoder encoder;
     private final JwtDecoder decoder;
     private final AuthProperties properties;
@@ -24,13 +25,17 @@ public class JwtService {
         }
         SecretKey key = new SecretKeySpec(bytes, "HmacSHA256");
         this.encoder = new NimbusJwtEncoder(new com.nimbusds.jose.jwk.source.ImmutableSecret<>(key));
-        this.decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key)
+                .macAlgorithm(MacAlgorithm.HS256)
+                .build();
+        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(ISSUER));
+        this.decoder = decoder;
     }
 
     public String issueAccessToken(User user) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
-                .issuer("ai-library")
+                .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(properties.accessTtlMinutes() * 60))
                 .subject(user.getId().toString())
