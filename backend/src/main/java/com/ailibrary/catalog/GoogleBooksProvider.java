@@ -1,15 +1,14 @@
 package com.ailibrary.catalog;
 
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestClient;
-import tools.jackson.databind.JsonNode;
+import static com.ailibrary.catalog.CatalogJson.*;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
-import static com.ailibrary.catalog.CatalogJson.*;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClient;
+import tools.jackson.databind.JsonNode;
 
 @Component
 public class GoogleBooksProvider implements BookCatalogProvider {
@@ -22,21 +21,30 @@ public class GoogleBooksProvider implements BookCatalogProvider {
         this.client = builder.baseUrl(properties.googleBooks().baseUrl()).build();
     }
 
-    @Override public String providerName() { return NAME; }
-    @Override public boolean enabled() { return apiKey != null && !apiKey.isBlank(); }
+    @Override
+    public String providerName() {
+        return NAME;
+    }
+
+    @Override
+    public boolean enabled() {
+        return apiKey != null && !apiKey.isBlank();
+    }
 
     @Override
     public CatalogPage search(String query, int page, int size) {
         if (!enabled()) return new CatalogPage(List.of(), 0);
         int max = Math.min(size, 40);
         int start = Math.max(0, (Math.max(1, page) - 1) * max);
-        String body = client.get().uri(uri -> uri.path("/volumes")
+        String body = client.get()
+                .uri(uri -> uri.path("/volumes")
                         .queryParam("q", query)
                         .queryParam("startIndex", start)
                         .queryParam("maxResults", max)
                         .queryParam("key", apiKey)
                         .build())
-                .retrieve().body(String.class);
+                .retrieve()
+                .body(String.class);
         return mapSearch(parse(body));
     }
 
@@ -44,8 +52,11 @@ public class GoogleBooksProvider implements BookCatalogProvider {
     public Optional<CatalogBook> get(String externalId) {
         if (!enabled() || externalId == null || !externalId.matches("[A-Za-z0-9_-]{1,64}")) return Optional.empty();
         try {
-            String body = client.get().uri(uri -> uri.path("/volumes/{id}").queryParam("key", apiKey).build(externalId))
-                    .retrieve().body(String.class);
+            String body = client.get()
+                    .uri(uri ->
+                            uri.path("/volumes/{id}").queryParam("key", apiKey).build(externalId))
+                    .retrieve()
+                    .body(String.class);
             JsonNode node = parse(body);
             return node.isMissingNode() ? Optional.empty() : Optional.of(map(node));
         } catch (HttpClientErrorException.NotFound ex) {
@@ -70,16 +81,30 @@ public class GoogleBooksProvider implements BookCatalogProvider {
         String published = text(info, "publishedDate");
         Integer year = null;
         if (published != null && published.length() >= 4) {
-            try { year = Integer.valueOf(published.substring(0, 4)); } catch (NumberFormatException ignored) {}
+            try {
+                year = Integer.valueOf(published.substring(0, 4));
+            } catch (NumberFormatException ignored) {
+            }
         }
         String cover = text(info.path("imageLinks"), "thumbnail");
         if (cover != null && cover.startsWith("http://")) cover = "https://" + cover.substring("http://".length());
         boolean publicDomain = item.path("accessInfo").path("publicDomain").asBoolean(false);
         return new CatalogBook(
-                NAME, text(item, "id"), Optional.ofNullable(text(info, "title")).orElse("Untitled"), text(info, "subtitle"),
-                strings(info.path("authors")), isbn13, isbn10, text(info, "description"), strings(info.path("categories")),
-                text(info, "language"), text(info, "publisher"), year, integer(info, "pageCount"),
-                cover, publicDomain, text(info, "infoLink")
-        );
+                NAME,
+                text(item, "id"),
+                Optional.ofNullable(text(info, "title")).orElse("Untitled"),
+                text(info, "subtitle"),
+                strings(info.path("authors")),
+                isbn13,
+                isbn10,
+                text(info, "description"),
+                strings(info.path("categories")),
+                text(info, "language"),
+                text(info, "publisher"),
+                year,
+                integer(info, "pageCount"),
+                cover,
+                publicDomain,
+                text(info, "infoLink"));
     }
 }

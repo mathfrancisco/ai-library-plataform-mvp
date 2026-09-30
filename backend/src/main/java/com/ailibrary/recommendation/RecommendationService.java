@@ -11,6 +11,8 @@ import com.ailibrary.common.vector.VectorStoreAccess;
 import com.ailibrary.library.domain.LibraryStatus;
 import com.ailibrary.library.domain.UserLibraryItem;
 import com.ailibrary.library.repository.UserLibraryRepository;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -19,9 +21,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Explainable recommendations without an ML pipeline:
@@ -55,7 +54,9 @@ public class RecommendationService {
         Set<UUID> owned = items.stream().map(UserLibraryItem::getBookId).collect(Collectors.toSet());
         Map<UUID, Book> ownedBooks = new HashMap<>();
         books.findAllById(owned).forEach(b -> ownedBooks.put(b.getId(), b));
-        Set<String> ownedFingerprints = ownedBooks.values().stream().map(RecommendationService::fingerprint).collect(Collectors.toSet());
+        Set<String> ownedFingerprints = ownedBooks.values().stream()
+                .map(RecommendationService::fingerprint)
+                .collect(Collectors.toSet());
 
         Affinity affinity = Affinity.from(items, ownedBooks);
         if (affinity.isEmpty()) return List.of();
@@ -71,7 +72,8 @@ public class RecommendationService {
         rank = 1;
         for (Book b : vectorCandidates(affinity, owned, limit)) {
             if (ownedFingerprints.contains(fingerprint(b))) continue;
-            candidates.computeIfAbsent(b.getId(), k -> new Candidate(b))
+            candidates
+                    .computeIfAbsent(b.getId(), k -> new Candidate(b))
                     .add(1.0 / (RRF_K + rank++), List.of("Similar to " + affinity.seedTitles()));
         }
         return candidates.values().stream()
@@ -93,9 +95,13 @@ public class RecommendationService {
                 .collect(Collectors.joining(" or "));
         if (query.isBlank()) return List.of();
         try {
-            List<Book> found = books.lexicalSearch(query, 100).stream().filter(b -> !owned.contains(b.getId())).toList();
+            List<Book> found = books.lexicalSearch(query, 100).stream()
+                    .filter(b -> !owned.contains(b.getId()))
+                    .toList();
             // Rank by rule score, not text rank: author affinity dominates category affinity.
-            return found.stream().sorted(Comparator.comparingDouble(affinity::score).reversed()).toList();
+            return found.stream()
+                    .sorted(Comparator.comparingDouble(affinity::score).reversed())
+                    .toList();
         } catch (RuntimeException ex) {
             log.warn("Rule-based recommendation query failed: {}", ex.getMessage());
             return List.of();
@@ -106,16 +112,25 @@ public class RecommendationService {
         var store = vectors.store();
         if (store.isEmpty()) return List.of();
         String query = affinity.seeds().stream()
-                .map(b -> b.getTitle() + " " + Objects.toString(b.getCategoryNames(), "") + " " + Objects.toString(b.getDescription(), ""))
+                .map(b -> b.getTitle() + " " + Objects.toString(b.getCategoryNames(), "") + " "
+                        + Objects.toString(b.getDescription(), ""))
                 .collect(Collectors.joining("\n"));
         if (query.isBlank()) return List.of();
         try {
-            List<Document> docs = store.get().similaritySearch(SearchRequest.builder().query(query)
-                    .topK(Math.min(100, Math.max(20, limit * 3))).similarityThreshold(.45)
-                    .filterExpression(VectorFilters.books()).build());
+            List<Document> docs = store.get()
+                    .similaritySearch(SearchRequest.builder()
+                            .query(query)
+                            .topK(Math.min(100, Math.max(20, limit * 3)))
+                            .similarityThreshold(.45)
+                            .filterExpression(VectorFilters.books())
+                            .build());
             if (docs == null) return List.of();
-            List<UUID> ids = docs.stream().map(SimilarBookService::bookId).flatMap(Optional::stream)
-                    .filter(id -> !owned.contains(id)).distinct().toList();
+            List<UUID> ids = docs.stream()
+                    .map(SimilarBookService::bookId)
+                    .flatMap(Optional::stream)
+                    .filter(id -> !owned.contains(id))
+                    .distinct()
+                    .toList();
             Map<UUID, Book> byId = new HashMap<>();
             books.findAllById(ids).forEach(b -> byId.put(b.getId(), b));
             return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
@@ -126,17 +141,19 @@ public class RecommendationService {
     }
 
     private static String fingerprint(Book b) {
-        return BookFingerprint.of(b.getIsbn13(), b.getIsbn10(), b.getTitle(), BookMapper.toView(b).authors());
+        return BookFingerprint.of(
+                b.getIsbn13(), b.getIsbn10(), b.getTitle(), BookMapper.toView(b).authors());
     }
 
     static double seedWeight(UserLibraryItem item) {
         if (item.getStatus() == LibraryStatus.DROPPED) return 0;
         if (item.getRating() != null && item.getRating() <= 2) return 0;
-        double weight = switch (item.getStatus()) {
-            case READ, READING -> 1.0;
-            case WANT_TO_READ -> 0.5;
-            case DROPPED -> 0;
-        };
+        double weight =
+                switch (item.getStatus()) {
+                    case READ, READING -> 1.0;
+                    case WANT_TO_READ -> 0.5;
+                    case DROPPED -> 0;
+                };
         if (item.isFavorite()) weight += 3;
         if (item.getRating() != null && item.getRating() >= 4) weight += item.getRating() - 2;
         return weight;
@@ -160,7 +177,9 @@ public class RecommendationService {
                 view.authors().forEach(x -> a.bump(a.authors, x, w));
                 view.categories().forEach(x -> a.bump(a.categories, x, w));
             }
-            weighted.stream().sorted(Map.Entry.<Book, Double>comparingByValue().reversed()).limit(MAX_SEEDS)
+            weighted.stream()
+                    .sorted(Map.Entry.<Book, Double>comparingByValue().reversed())
+                    .limit(MAX_SEEDS)
                     .forEach(e -> a.seeds.add(e.getKey()));
             return a;
         }
@@ -172,9 +191,13 @@ public class RecommendationService {
             labels.putIfAbsent(key, raw.trim());
         }
 
-        boolean isEmpty() { return seeds.isEmpty(); }
+        boolean isEmpty() {
+            return seeds.isEmpty();
+        }
 
-        List<Book> seeds() { return seeds; }
+        List<Book> seeds() {
+            return seeds;
+        }
 
         String seedTitles() {
             return seeds.stream().limit(2).map(Book::getTitle).collect(Collectors.joining(" and "));
@@ -191,23 +214,31 @@ public class RecommendationService {
             BookView view = BookMapper.toView(b);
             double s = 0;
             for (String x : view.authors()) s += authors.getOrDefault(BookFingerprint.normalizeText(x), 0.0);
-            for (String x : view.categories()) s += 0.5 * categories.getOrDefault(BookFingerprint.normalizeText(x), 0.0);
+            for (String x : view.categories())
+                s += 0.5 * categories.getOrDefault(BookFingerprint.normalizeText(x), 0.0);
             return s;
         }
 
         List<String> explain(Book b) {
             BookView view = BookMapper.toView(b);
             List<String> reasons = new ArrayList<>();
-            view.authors().stream().filter(x -> authors.containsKey(BookFingerprint.normalizeText(x))).findFirst()
+            view.authors().stream()
+                    .filter(x -> authors.containsKey(BookFingerprint.normalizeText(x)))
+                    .findFirst()
                     .ifPresent(x -> reasons.add("More from " + x));
-            view.categories().stream().filter(x -> categories.containsKey(BookFingerprint.normalizeText(x))).findFirst()
+            view.categories().stream()
+                    .filter(x -> categories.containsKey(BookFingerprint.normalizeText(x)))
+                    .findFirst()
                     .ifPresent(x -> reasons.add("Matches your interest in " + x));
             return reasons;
         }
 
         private static List<String> top(Map<String, Double> map, int n) {
-            return map.entrySet().stream().sorted(Map.Entry.<String, Double>comparingByValue().reversed())
-                    .limit(Math.max(0, n)).map(Map.Entry::getKey).toList();
+            return map.entrySet().stream()
+                    .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                    .limit(Math.max(0, n))
+                    .map(Map.Entry::getKey)
+                    .toList();
         }
     }
 
@@ -216,15 +247,21 @@ public class RecommendationService {
         final LinkedHashSet<String> reasons = new LinkedHashSet<>();
         double score;
 
-        Candidate(Book book) { this.book = book; }
+        Candidate(Book book) {
+            this.book = book;
+        }
 
         void add(double value, List<String> why) {
             score += value;
             reasons.addAll(why);
         }
 
-        double score() { return score; }
+        double score() {
+            return score;
+        }
 
-        Recommendation toView() { return new Recommendation(BookMapper.toView(book), score, List.copyOf(reasons)); }
+        Recommendation toView() {
+            return new Recommendation(BookMapper.toView(book), score, List.copyOf(reasons));
+        }
     }
 }

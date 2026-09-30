@@ -18,5 +18,4 @@ public record CatalogBook(
         Integer pageCount,
         String coverUrl,
         boolean publicDomain,
-        String sourceUrl
-) {}
+        String sourceUrl) {}

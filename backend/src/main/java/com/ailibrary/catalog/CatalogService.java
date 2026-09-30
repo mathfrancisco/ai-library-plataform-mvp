@@ -10,15 +10,14 @@ import com.ailibrary.book.service.BookMapper;
 import com.ailibrary.book.service.BookVectorIndexer;
 import com.ailibrary.common.error.BadRequestException;
 import com.ailibrary.common.error.NotFoundException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CatalogService {
@@ -31,8 +30,11 @@ public class CatalogService {
     private final BookVectorIndexer vectorIndexer;
     private final Map<String, CachedPage> searchCache = new ConcurrentHashMap<>();
 
-    public CatalogService(List<BookCatalogProvider> providers, BookRepository books,
-                          ExternalBookReferenceRepository refs, BookVectorIndexer vectorIndexer) {
+    public CatalogService(
+            List<BookCatalogProvider> providers,
+            BookRepository books,
+            ExternalBookReferenceRepository refs,
+            BookVectorIndexer vectorIndexer) {
         this.providers = providers;
         this.books = books;
         this.refs = refs;
@@ -43,15 +45,20 @@ public class CatalogService {
         String cacheKey = query.trim().toLowerCase(Locale.ROOT) + "|" + page + "|" + size;
         CachedPage cached = searchCache.get(cacheKey);
         if (cached != null && cached.expiresAt().isAfter(Instant.now())) return cached.page();
-        CatalogPage result = merge(providers.stream().filter(BookCatalogProvider::enabled).map(provider -> {
-            try {
-                return provider.search(query, page, size);
-            } catch (RuntimeException ex) {
-                // Provider failure must not take the whole federated search down.
-                log.warn("Catalog provider {} failed: {}", provider.providerName(), ex.getMessage());
-                return new CatalogPage(List.of(), 0);
-            }
-        }).toList(), size);
+        CatalogPage result = merge(
+                providers.stream()
+                        .filter(BookCatalogProvider::enabled)
+                        .map(provider -> {
+                            try {
+                                return provider.search(query, page, size);
+                            } catch (RuntimeException ex) {
+                                // Provider failure must not take the whole federated search down.
+                                log.warn("Catalog provider {} failed: {}", provider.providerName(), ex.getMessage());
+                                return new CatalogPage(List.of(), 0);
+                            }
+                        })
+                        .toList(),
+                size);
         if (searchCache.size() > MAX_CACHED_PAGES) searchCache.clear();
         searchCache.put(cacheKey, new CachedPage(result, Instant.now().plus(5, ChronoUnit.MINUTES)));
         return result;
@@ -76,26 +83,39 @@ public class CatalogService {
 
     @Transactional
     public BookView importBook(String providerName, String externalId) {
-        ExternalBookReference existingRef = refs.findByProviderAndExternalId(providerName, externalId).orElse(null);
+        ExternalBookReference existingRef =
+                refs.findByProviderAndExternalId(providerName, externalId).orElse(null);
         if (existingRef != null) {
             return BookMapper.toView(books.findById(existingRef.getBookId()).orElseThrow(NotFoundException::book));
         }
 
         BookCatalogProvider provider = providers.stream()
                 .filter(p -> p.providerName().equalsIgnoreCase(providerName) && p.enabled())
-                .findFirst().orElseThrow(() -> new BadRequestException("PROVIDER_UNAVAILABLE", "Catalog provider is not available"));
+                .findFirst()
+                .orElseThrow(
+                        () -> new BadRequestException("PROVIDER_UNAVAILABLE", "Catalog provider is not available"));
         CatalogBook source = provider.get(externalId)
                 .orElseThrow(() -> new NotFoundException("EXTERNAL_BOOK_NOT_FOUND", "External book not found"));
 
         Optional<Book> existing = findExisting(source);
         Book book = existing.orElseGet(() -> books.save(new Book(
-                BookFingerprint.isbn13(source.isbn13()), BookFingerprint.isbn10(source.isbn10()), source.title(), source.subtitle(),
-                BookMapper.join(source.authors()), BookMapper.join(source.categories()), source.description(), source.language(),
-                source.publisher(), source.publishedYear(), source.pageCount(), source.coverUrl(), source.publicDomain()
-        )));
+                BookFingerprint.isbn13(source.isbn13()),
+                BookFingerprint.isbn10(source.isbn10()),
+                source.title(),
+                source.subtitle(),
+                BookMapper.join(source.authors()),
+                BookMapper.join(source.categories()),
+                source.description(),
+                source.language(),
+                source.publisher(),
+                source.publishedYear(),
+                source.pageCount(),
+                source.coverUrl(),
+                source.publicDomain())));
 
         refs.findByProviderAndExternalId(source.provider(), source.externalId())
-                .orElseGet(() -> refs.save(new ExternalBookReference(book.getId(), source.provider(), source.externalId(), source.sourceUrl())));
+                .orElseGet(() -> refs.save(new ExternalBookReference(
+                        book.getId(), source.provider(), source.externalId(), source.sourceUrl())));
         if (existing.isEmpty()) vectorIndexer.index(book);
         return BookMapper.toView(book);
     }
@@ -115,7 +135,9 @@ public class CatalogService {
         if (source.title() == null) return Optional.empty();
         String wanted = BookFingerprint.of(null, null, source.title(), source.authors());
         return books.findTop20ByTitleIgnoreCase(source.title().trim()).stream()
-                .filter(b -> BookFingerprint.of(null, null, b.getTitle(), BookMapper.toView(b).authors()).equals(wanted))
+                .filter(b -> BookFingerprint.of(
+                                null, null, b.getTitle(), BookMapper.toView(b).authors())
+                        .equals(wanted))
                 .findFirst();
     }
 }

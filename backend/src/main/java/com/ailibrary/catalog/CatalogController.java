@@ -17,9 +17,10 @@ public class CatalogController {
     }
 
     @GetMapping("/search")
-    public CatalogPage search(@RequestParam @NotBlank String q,
-                              @RequestParam(defaultValue = "1") @Min(1) int page,
-                              @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
+    public CatalogPage search(
+            @RequestParam @NotBlank String q,
+            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
         return catalog.search(q, page, size);
     }
 

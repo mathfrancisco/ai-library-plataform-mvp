@@ -1,5 +1,9 @@
 package com.ailibrary.dashboard;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.*;
+
 import com.ailibrary.book.domain.Book;
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.library.domain.LibraryStatus;
@@ -7,18 +11,13 @@ import com.ailibrary.library.domain.UserLibraryItem;
 import com.ailibrary.library.repository.UserLibraryRepository;
 import com.ailibrary.reading.domain.ReadingProgress;
 import com.ailibrary.reading.repository.ReadingProgressRepository;
-import org.junit.jupiter.api.Test;
-
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
 
 class DashboardServiceTest {
     @Test
@@ -43,7 +42,11 @@ class DashboardServiceTest {
         when(progress.findByUserId(user)).thenReturn(List.of(p1, p2, lastYear));
         when(books.findAllById(anyCollection())).thenReturn(List.of(reading));
 
-        var d = new DashboardService(library, progress, books, Clock.fixed(LocalDate.of(2026, 9, 30).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC))
+        var d = new DashboardService(
+                        library,
+                        progress,
+                        books,
+                        Clock.fixed(LocalDate.of(2026, 9, 30).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC))
                 .get(user);
 
         assertThat(d.totalBooks()).isEqualTo(3);
@@ -56,6 +59,7 @@ class DashboardServiceTest {
         assertThat(d.averageProgress()).isEqualTo(25.0);
         assertThat(d.averageRating()).isEqualTo(4.5);
         assertThat(d.completedThisYear()).isEqualTo(1);
-        assertThat(d.currentlyReading()).singleElement().satisfies(c -> assertThat(c.title()).isEqualTo("Dune"));
+        assertThat(d.currentlyReading()).singleElement().satisfies(c -> assertThat(c.title())
+                .isEqualTo("Dune"));
     }
 }

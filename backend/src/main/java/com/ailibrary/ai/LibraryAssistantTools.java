@@ -6,12 +6,11 @@ import com.ailibrary.library.dto.LibraryDtos.UpsertRequest;
 import com.ailibrary.library.service.LibraryService;
 import com.ailibrary.reading.dto.ReadingDtos.ProgressView;
 import com.ailibrary.reading.service.ReadingProgressService;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 
 /**
  * Tools are instantiated per request and bound to the authenticated user. The LLM never supplies
@@ -30,7 +29,8 @@ public class LibraryAssistantTools {
 
     @Tool(description = "List books from the authenticated user's library, optionally filtered by status")
     public List<LibraryItemView> getMyBooksByStatus(
-            @ToolParam(required = false, description = "One of WANT_TO_READ, READING, READ, DROPPED; empty for all") String status) {
+            @ToolParam(required = false, description = "One of WANT_TO_READ, READING, READ, DROPPED; empty for all")
+                    String status) {
         return library.list(userId, status == null || status.isBlank() ? null : parseStatus(status));
     }
 
@@ -53,11 +53,13 @@ public class LibraryAssistantTools {
 
     static LibraryStatus parseStatus(String raw) {
         if (raw == null || raw.isBlank()) return LibraryStatus.WANT_TO_READ;
-        String normalized = raw.trim().toUpperCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+        String normalized =
+                raw.trim().toUpperCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
         try {
             return LibraryStatus.valueOf(normalized);
         } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Unknown status '" + raw + "'. Use WANT_TO_READ, READING, READ or DROPPED.");
+            throw new IllegalArgumentException(
+                    "Unknown status '" + raw + "'. Use WANT_TO_READ, READING, READ or DROPPED.");
         }
     }
 

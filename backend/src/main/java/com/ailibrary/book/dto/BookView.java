@@ -17,5 +17,4 @@ public record BookView(
         Integer publishedYear,
         Integer pageCount,
         String coverUrl,
-        boolean publicDomain
-) {}
+        boolean publicDomain) {}

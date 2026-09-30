@@ -3,6 +3,8 @@ package com.ailibrary.auth.service;
 import com.ailibrary.auth.repository.RefreshTokenRepository;
 import com.ailibrary.auth.repository.UserRepository;
 import com.ailibrary.common.security.AuthProperties;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -10,9 +12,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 
 @Component
 public class AuthMaintenance {

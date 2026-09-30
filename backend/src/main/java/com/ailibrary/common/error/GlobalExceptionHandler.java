@@ -2,14 +2,15 @@ package com.ailibrary.common.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,8 +20,6 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-
-import java.time.Instant;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -45,7 +44,9 @@ public class GlobalExceptionHandler {
         String message = ex.getParameterValidationResults().stream()
                 .flatMap(r -> r.getResolvableErrors().stream().map(e -> {
                     // Errors on a validated @RequestBody are field errors; report the field, not the parameter.
-                    String name = e instanceof FieldError fe ? fe.getField() : r.getMethodParameter().getParameterName();
+                    String name = e instanceof FieldError fe
+                            ? fe.getField()
+                            : r.getMethodParameter().getParameterName();
                     return name + ": " + e.getDefaultMessage();
                 }))
                 .findFirst()
@@ -60,7 +61,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ResponseEntity<ApiError> typeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
-        return error(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Invalid value for parameter '" + ex.getName() + "'", request);
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "VALIDATION_ERROR",
+                "Invalid value for parameter '" + ex.getName() + "'",
+                request);
     }
 
     @ExceptionHandler({MissingServletRequestParameterException.class, MissingServletRequestPartException.class})
@@ -101,7 +106,6 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ApiError> error(HttpStatus status, String code, String message, HttpServletRequest request) {
-        return ResponseEntity.status(status)
-                .body(new ApiError(code, message, Instant.now(), request.getRequestURI()));
+        return ResponseEntity.status(status).body(new ApiError(code, message, Instant.now(), request.getRequestURI()));
     }
 }

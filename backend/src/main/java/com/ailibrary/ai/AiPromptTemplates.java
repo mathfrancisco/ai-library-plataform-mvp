@@ -1,13 +1,14 @@
 package com.ailibrary.ai;
 
+import java.util.Map;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.stereotype.Component;
-import java.util.Map;
 
 @Component
 public class AiPromptTemplates {
     private static final PromptTemplate GROUNDED_QA = PromptTemplate.builder()
-            .template("""
+            .template(
+                    """
                     <question>
                     {question}
                     </question>

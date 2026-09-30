@@ -1,11 +1,10 @@
 package com.ailibrary.library.domain;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "user_library", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "book_id"}))
@@ -41,13 +40,33 @@ public class UserLibraryItem {
         this.status = status;
     }
 
-    public UUID getId() { return id; }
-    public UUID getUserId() { return userId; }
-    public UUID getBookId() { return bookId; }
-    public LibraryStatus getStatus() { return status; }
-    public boolean isFavorite() { return favorite; }
-    public Integer getRating() { return rating; }
-    public Instant getAddedAt() { return addedAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public UUID getBookId() {
+        return bookId;
+    }
+
+    public LibraryStatus getStatus() {
+        return status;
+    }
+
+    public boolean isFavorite() {
+        return favorite;
+    }
+
+    public Integer getRating() {
+        return rating;
+    }
+
+    public Instant getAddedAt() {
+        return addedAt;
+    }
 
     public void update(LibraryStatus status, Boolean favorite, Integer rating) {
         if (status != null) this.status = status;

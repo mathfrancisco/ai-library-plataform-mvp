@@ -3,6 +3,7 @@ package com.ailibrary.document;
 import com.ailibrary.document.domain.DocumentStatus;
 import com.ailibrary.document.domain.UserDocument;
 import com.ailibrary.document.repository.UserDocumentRepository;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -11,8 +12,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-
-import java.util.List;
 
 @Component
 public class DocumentIngestionWorker {

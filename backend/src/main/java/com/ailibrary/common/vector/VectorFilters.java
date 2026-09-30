@@ -1,10 +1,9 @@
 package com.ailibrary.common.vector;
 
-import org.springframework.ai.vectorstore.filter.Filter;
-import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
-
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 
 /**
  * Metadata filters for the shared vector store. Private chunk filters always include the owner,
@@ -33,8 +32,8 @@ public final class VectorFilters {
         Objects.requireNonNull(scopeId, scopeKey + " is mandatory");
         var b = new FilterExpressionBuilder();
         return b.and(
-                b.and(b.eq("type", TYPE_DOCUMENT_CHUNK), b.eq("ownerId", ownerId.toString())),
-                b.eq(scopeKey, scopeId.toString())
-        ).build();
+                        b.and(b.eq("type", TYPE_DOCUMENT_CHUNK), b.eq("ownerId", ownerId.toString())),
+                        b.eq(scopeKey, scopeId.toString()))
+                .build();
     }
 }

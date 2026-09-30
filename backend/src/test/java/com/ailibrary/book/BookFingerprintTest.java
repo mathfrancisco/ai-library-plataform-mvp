@@ -1,16 +1,16 @@
 package com.ailibrary.book;
 
-import com.ailibrary.book.service.BookFingerprint;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
+
+import com.ailibrary.book.service.BookFingerprint;
+import java.util.List;
+import org.junit.jupiter.api.Test;
 
 class BookFingerprintTest {
     @Test
     void isbn13WinsAndIgnoresFormatting() {
-        assertThat(BookFingerprint.of("978-0-13-449416-6", "0134494164", "Clean Architecture", List.of("Robert C. Martin")))
+        assertThat(BookFingerprint.of(
+                        "978-0-13-449416-6", "0134494164", "Clean Architecture", List.of("Robert C. Martin")))
                 .isEqualTo("isbn13:9780134494166");
     }
 
@@ -29,6 +29,7 @@ class BookFingerprintTest {
 
     @Test
     void invalidIsbnsFallBackToTitle() {
-        assertThat(BookFingerprint.of("123", "abc", "Dune", List.of("Frank Herbert"))).isEqualTo("title:dune::frank herbert");
+        assertThat(BookFingerprint.of("123", "abc", "Dune", List.of("Frank Herbert")))
+                .isEqualTo("title:dune::frank herbert");
     }
 }

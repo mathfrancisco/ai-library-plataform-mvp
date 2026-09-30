@@ -1,7 +1,6 @@
 package com.ailibrary.auth.domain;
 
 import jakarta.persistence.*;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -37,12 +36,31 @@ public class User {
         this.role = Role.USER;
     }
 
-    public void promoteToAdmin() { this.role = Role.ADMIN; }
+    public void promoteToAdmin() {
+        this.role = Role.ADMIN;
+    }
 
-    public UUID getId() { return id; }
-    public String getEmail() { return email; }
-    public String getPasswordHash() { return passwordHash; }
-    public String getDisplayName() { return displayName; }
-    public Role getRole() { return role; }
-    public Instant getCreatedAt() { return createdAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
 }

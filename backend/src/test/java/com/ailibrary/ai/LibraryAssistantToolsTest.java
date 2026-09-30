@@ -1,17 +1,16 @@
 package com.ailibrary.ai;
 
-import com.ailibrary.library.domain.LibraryStatus;
-import com.ailibrary.library.dto.LibraryDtos.UpsertRequest;
-import com.ailibrary.library.service.LibraryService;
-import com.ailibrary.reading.service.ReadingProgressService;
-import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+
+import com.ailibrary.library.domain.LibraryStatus;
+import com.ailibrary.library.dto.LibraryDtos.UpsertRequest;
+import com.ailibrary.library.service.LibraryService;
+import com.ailibrary.reading.service.ReadingProgressService;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
 
 class LibraryAssistantToolsTest {
     @Test
@@ -27,12 +26,14 @@ class LibraryAssistantToolsTest {
     void parsesStatusLeniently() {
         assertThat(LibraryAssistantTools.parseStatus("want to read")).isEqualTo(LibraryStatus.WANT_TO_READ);
         assertThat(LibraryAssistantTools.parseStatus("read")).isEqualTo(LibraryStatus.READ);
-        assertThatThrownBy(() -> LibraryAssistantTools.parseStatus("delete everything")).hasMessageContaining("Unknown status");
+        assertThatThrownBy(() -> LibraryAssistantTools.parseStatus("delete everything"))
+                .hasMessageContaining("Unknown status");
     }
 
     @Test
     void rejectsNonUuidBookIds() {
-        var tools = new LibraryAssistantTools(UUID.randomUUID(), mock(LibraryService.class), mock(ReadingProgressService.class));
+        var tools = new LibraryAssistantTools(
+                UUID.randomUUID(), mock(LibraryService.class), mock(ReadingProgressService.class));
         assertThatThrownBy(() -> tools.getReadingProgress("Dune")).hasMessageContaining("UUID");
     }
 }

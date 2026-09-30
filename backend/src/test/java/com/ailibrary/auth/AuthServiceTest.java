@@ -1,5 +1,11 @@
 package com.ailibrary.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
 import com.ailibrary.auth.domain.RefreshToken;
 import com.ailibrary.auth.domain.User;
 import com.ailibrary.auth.dto.AuthDtos.*;
@@ -9,24 +15,17 @@ import com.ailibrary.auth.service.AuthService;
 import com.ailibrary.common.error.ApiException;
 import com.ailibrary.common.security.AuthProperties;
 import com.ailibrary.common.security.JwtService;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
-
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
 
 class AuthServiceTest {
     private final UserRepository users = mock(UserRepository.class);
@@ -40,8 +39,13 @@ class AuthServiceTest {
     void setUp() {
         service = new AuthService(users, tokens, NoOpPasswordEncoder.getInstance(), new JwtService(props), props);
         when(users.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(tokens.save(any())).thenAnswer(i -> { RefreshToken t = i.getArgument(0); stored.put(t.getTokenHash(), t); return t; });
-        when(tokens.findByTokenHash(anyString())).thenAnswer(i -> Optional.ofNullable(stored.get(i.<String>getArgument(0))));
+        when(tokens.save(any())).thenAnswer(i -> {
+            RefreshToken t = i.getArgument(0);
+            stored.put(t.getTokenHash(), t);
+            return t;
+        });
+        when(tokens.findByTokenHash(anyString()))
+                .thenAnswer(i -> Optional.ofNullable(stored.get(i.<String>getArgument(0))));
     }
 
     @Test
@@ -81,6 +85,7 @@ class AuthServiceTest {
     }
 
     private static String sha256(String v) throws Exception {
-        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));
+        return HexFormat.of()
+                .formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));
     }
 }

@@ -9,15 +9,14 @@ import com.ailibrary.reading.domain.ReadingProgress;
 import com.ailibrary.reading.dto.ReadingDtos.ProgressView;
 import com.ailibrary.reading.dto.ReadingDtos.UpdateRequest;
 import com.ailibrary.reading.repository.ReadingProgressRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ReadingProgressService {
@@ -48,18 +47,23 @@ public class ReadingProgressService {
     @Transactional
     public ProgressView upsert(UUID userId, UUID bookId, UpdateRequest request) {
         Book book = books.findById(bookId).orElseThrow(NotFoundException::book);
-        if (request.currentPage() != null && book.getPageCount() != null && book.getPageCount() > 0
+        if (request.currentPage() != null
+                && book.getPageCount() != null
+                && book.getPageCount() > 0
                 && request.currentPage() > book.getPageCount())
             throw new BadRequestException("VALIDATION_ERROR", "currentPage exceeds the book's page count");
-        ReadingProgress p = progress.findByUserIdAndBookId(userId, bookId)
-                .orElseGet(() -> new ReadingProgress(userId, bookId));
+        ReadingProgress p =
+                progress.findByUserIdAndBookId(userId, bookId).orElseGet(() -> new ReadingProgress(userId, bookId));
         BigDecimal percentage = request.percentage();
-        if (percentage == null && request.currentPage() != null) percentage = derivePercentage(request.currentPage(), book.getPageCount());
+        if (percentage == null && request.currentPage() != null)
+            percentage = derivePercentage(request.currentPage(), book.getPageCount());
         LocalDate startedAt = request.startedAt();
         if (startedAt == null && p.getStartedAt() == null && request.currentPage() != null && request.currentPage() > 0)
             startedAt = today();
         p.update(request.currentPage(), percentage, startedAt, request.completedAt(), request.notes());
-        if (p.getStartedAt() != null && p.getCompletedAt() != null && p.getCompletedAt().isBefore(p.getStartedAt()))
+        if (p.getStartedAt() != null
+                && p.getCompletedAt() != null
+                && p.getCompletedAt().isBefore(p.getStartedAt()))
             throw new BadRequestException("VALIDATION_ERROR", "completedAt cannot be before startedAt");
         return view(progress.save(p));
     }
@@ -69,8 +73,8 @@ public class ReadingProgressService {
     public void onStatusChanged(UUID userId, UUID bookId, LibraryStatus status) {
         if (status != LibraryStatus.READING && status != LibraryStatus.READ) return;
         Book book = books.findById(bookId).orElseThrow(NotFoundException::book);
-        ReadingProgress p = progress.findByUserIdAndBookId(userId, bookId)
-                .orElseGet(() -> new ReadingProgress(userId, bookId));
+        ReadingProgress p =
+                progress.findByUserIdAndBookId(userId, bookId).orElseGet(() -> new ReadingProgress(userId, bookId));
         LocalDate today = today();
         if (status == LibraryStatus.READING) {
             p.update(null, null, p.getStartedAt() == null ? today : null, null, null);
@@ -84,7 +88,8 @@ public class ReadingProgressService {
 
     static BigDecimal derivePercentage(int currentPage, Integer pageCount) {
         if (pageCount == null || pageCount <= 0) return null;
-        return BigDecimal.valueOf(currentPage).multiply(HUNDRED)
+        return BigDecimal.valueOf(currentPage)
+                .multiply(HUNDRED)
                 .divide(BigDecimal.valueOf(pageCount), 2, RoundingMode.HALF_UP)
                 .min(HUNDRED);
     }
@@ -94,6 +99,12 @@ public class ReadingProgressService {
     }
 
     private ProgressView view(ReadingProgress p) {
-        return new ProgressView(p.getBookId(), p.getCurrentPage(), p.getPercentage(), p.getStartedAt(), p.getCompletedAt(), p.getNotes());
+        return new ProgressView(
+                p.getBookId(),
+                p.getCurrentPage(),
+                p.getPercentage(),
+                p.getStartedAt(),
+                p.getCompletedAt(),
+                p.getNotes());
     }
 }

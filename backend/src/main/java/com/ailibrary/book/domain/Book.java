@@ -1,7 +1,6 @@
 package com.ailibrary.book.domain;
 
 import jakarta.persistence.*;
-
 import java.time.Instant;
 import java.util.UUID;
 
@@ -52,9 +51,20 @@ public class Book {
 
     protected Book() {}
 
-    public Book(String isbn13, String isbn10, String title, String subtitle, String authorNames,
-                String categoryNames, String description, String language, String publisher,
-                Integer publishedYear, Integer pageCount, String coverUrl, boolean publicDomain) {
+    public Book(
+            String isbn13,
+            String isbn10,
+            String title,
+            String subtitle,
+            String authorNames,
+            String categoryNames,
+            String description,
+            String language,
+            String publisher,
+            Integer publishedYear,
+            Integer pageCount,
+            String coverUrl,
+            boolean publicDomain) {
         this.id = UUID.randomUUID();
         this.isbn13 = isbn13;
         this.isbn10 = isbn10;
@@ -71,19 +81,63 @@ public class Book {
         this.publicDomain = publicDomain;
     }
 
-    public UUID getId() { return id; }
-    public String getIsbn13() { return isbn13; }
-    public String getIsbn10() { return isbn10; }
-    public String getTitle() { return title; }
-    public String getSubtitle() { return subtitle; }
-    public String getAuthorNames() { return authorNames; }
-    public String getCategoryNames() { return categoryNames; }
-    public String getDescription() { return description; }
-    public String getLanguage() { return language; }
-    public String getPublisher() { return publisher; }
-    public Integer getPublishedYear() { return publishedYear; }
-    public Integer getPageCount() { return pageCount; }
-    public String getCoverUrl() { return coverUrl; }
-    public boolean isPublicDomain() { return publicDomain; }
-    public Instant getCreatedAt() { return createdAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public String getIsbn13() {
+        return isbn13;
+    }
+
+    public String getIsbn10() {
+        return isbn10;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getSubtitle() {
+        return subtitle;
+    }
+
+    public String getAuthorNames() {
+        return authorNames;
+    }
+
+    public String getCategoryNames() {
+        return categoryNames;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public String getPublisher() {
+        return publisher;
+    }
+
+    public Integer getPublishedYear() {
+        return publishedYear;
+    }
+
+    public Integer getPageCount() {
+        return pageCount;
+    }
+
+    public String getCoverUrl() {
+        return coverUrl;
+    }
+
+    public boolean isPublicDomain() {
+        return publicDomain;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
 }

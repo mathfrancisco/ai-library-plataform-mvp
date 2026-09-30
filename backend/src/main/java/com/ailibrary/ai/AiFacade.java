@@ -3,13 +3,12 @@ package com.ailibrary.ai;
 import com.ailibrary.ai.domain.AiRequestLog;
 import com.ailibrary.ai.repository.AiRequestLogRepository;
 import com.ailibrary.common.error.BadRequestException;
+import java.util.UUID;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
-
-import java.util.UUID;
 
 @Service
 @EnableConfigurationProperties(AiProperties.class)
@@ -19,7 +18,11 @@ public class AiFacade {
     private final AiRequestLogRepository logs;
     private final AiRateLimiter rateLimiter;
 
-    public AiFacade(ChatClient.Builder builder, AiProperties properties, AiRequestLogRepository logs, AiRateLimiter rateLimiter) {
+    public AiFacade(
+            ChatClient.Builder builder,
+            AiProperties properties,
+            AiRequestLogRepository logs,
+            AiRateLimiter rateLimiter) {
         this.chatClient = builder.build();
         this.properties = properties;
         this.logs = logs;
@@ -31,7 +34,8 @@ public class AiFacade {
         rateLimiter.check(userId);
         long started = System.nanoTime();
         try {
-            ChatResponse response = chatClient.prompt().system(system).user(user).call().chatResponse();
+            ChatResponse response =
+                    chatClient.prompt().system(system).user(user).call().chatResponse();
             if (response == null) throw new IllegalStateException("Empty AI response");
             saveLog(userId, operation, started, response, null);
             return response.getResult().getOutput().getText();
@@ -46,7 +50,11 @@ public class AiFacade {
         rateLimiter.check(userId);
         long started = System.nanoTime();
         try {
-            var result = chatClient.prompt().system(system).user(user).call()
+            var result = chatClient
+                    .prompt()
+                    .system(system)
+                    .user(user)
+                    .call()
                     .responseEntity(type, spec -> spec.validateSchema());
             saveLog(userId, operation, started, result.response(), null);
             return result.entity();
@@ -61,7 +69,13 @@ public class AiFacade {
         rateLimiter.check(userId);
         long started = System.nanoTime();
         try {
-            ChatResponse response = chatClient.prompt().system(system).user(user).tools(tools).call().chatResponse();
+            ChatResponse response = chatClient
+                    .prompt()
+                    .system(system)
+                    .user(user)
+                    .tools(tools)
+                    .call()
+                    .chatResponse();
             if (response == null) throw new IllegalStateException("Empty AI response");
             saveLog(userId, operation, started, response, null);
             return response.getResult().getOutput().getText();
@@ -71,20 +85,35 @@ public class AiFacade {
         }
     }
 
-    public AiProperties properties() { return properties; }
+    public AiProperties properties() {
+        return properties;
+    }
 
     private void ensureEnabled() {
-        if (!properties.enabled()) throw new BadRequestException("AI_DISABLED", "AI features are disabled; set AI_ENABLED=true and configure a provider");
+        if (!properties.enabled())
+            throw new BadRequestException(
+                    "AI_DISABLED", "AI features are disabled; set AI_ENABLED=true and configure a provider");
     }
 
     private void saveLog(UUID userId, String operation, long started, ChatResponse response, RuntimeException error) {
         Integer in = null, out = null;
         if (response != null && response.getMetadata() != null) {
             Usage usage = response.getMetadata().getUsage();
-            if (usage != null) { in = usage.getPromptTokens(); out = usage.getCompletionTokens(); }
+            if (usage != null) {
+                in = usage.getPromptTokens();
+                out = usage.getCompletionTokens();
+            }
         }
         long latency = (System.nanoTime() - started) / 1_000_000L;
-        logs.save(new AiRequestLog(userId, operation, properties.provider(), properties.model(), in, out, latency,
-                error == null, error == null ? null : error.getClass().getSimpleName()));
+        logs.save(new AiRequestLog(
+                userId,
+                operation,
+                properties.provider(),
+                properties.model(),
+                in,
+                out,
+                latency,
+                error == null,
+                error == null ? null : error.getClass().getSimpleName()));
     }
 }

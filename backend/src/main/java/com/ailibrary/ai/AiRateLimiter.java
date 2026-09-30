@@ -1,12 +1,11 @@
 package com.ailibrary.ai;
 
 import com.ailibrary.common.error.RateLimitException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-
 import java.time.Clock;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 /** In-memory per-user fixed-window limiter. Multi-instance deployments should move this to a shared store. */
 @Component
@@ -29,7 +28,10 @@ public class AiRateLimiter {
         long minute = clock.instant().getEpochSecond() / 60;
         Window w = windows.computeIfAbsent(userId, k -> new Window(minute));
         synchronized (w) {
-            if (w.minute != minute) { w.minute = minute; w.count = 0; }
+            if (w.minute != minute) {
+                w.minute = minute;
+                w.count = 0;
+            }
             if (++w.count > maxPerMinute) throw new RateLimitException("AI rate limit exceeded; try again shortly");
         }
         if (windows.size() > 10_000) windows.entrySet().removeIf(e -> e.getValue().minute < minute - 5);
@@ -38,6 +40,9 @@ public class AiRateLimiter {
     private static final class Window {
         long minute;
         int count;
-        Window(long minute) { this.minute = minute; }
+
+        Window(long minute) {
+            this.minute = minute;
+        }
     }
 }

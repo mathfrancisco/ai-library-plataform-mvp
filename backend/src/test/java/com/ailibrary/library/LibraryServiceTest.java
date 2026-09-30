@@ -1,5 +1,10 @@
 package com.ailibrary.library;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.ailibrary.book.domain.Book;
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.error.NotFoundException;
@@ -9,16 +14,10 @@ import com.ailibrary.library.dto.LibraryDtos.UpsertRequest;
 import com.ailibrary.library.repository.UserLibraryRepository;
 import com.ailibrary.library.service.LibraryService;
 import com.ailibrary.reading.service.ReadingProgressService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.util.Optional;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class LibraryServiceTest {
     private final UserLibraryRepository repo = mock(UserLibraryRepository.class);
@@ -26,7 +25,8 @@ class LibraryServiceTest {
     private final ReadingProgressService reading = mock(ReadingProgressService.class);
     private final LibraryService service = new LibraryService(repo, books, reading);
     private final UUID alice = UUID.randomUUID(), bob = UUID.randomUUID();
-    private final Book book = new Book(null, null, "Dune", null, "Frank Herbert", null, null, null, null, null, null, null, false);
+    private final Book book =
+            new Book(null, null, "Dune", null, "Frank Herbert", null, null, null, null, null, null, null, false);
 
     @BeforeEach
     void setUp() {
@@ -67,6 +67,7 @@ class LibraryServiceTest {
         UUID missing = UUID.randomUUID();
         when(books.findById(missing)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.upsert(alice, missing, new UpsertRequest(null, null, null)))
-                .isInstanceOf(NotFoundException.class).hasMessage("Book not found");
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Book not found");
     }
 }

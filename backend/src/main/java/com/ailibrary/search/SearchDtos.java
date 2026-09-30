@@ -2,17 +2,29 @@ package com.ailibrary.search;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-
 import java.util.List;
 import java.util.UUID;
 
 public final class SearchDtos {
     private SearchDtos() {}
 
-    public enum SearchMode { LEXICAL, SEMANTIC, HYBRID }
+    public enum SearchMode {
+        LEXICAL,
+        SEMANTIC,
+        HYBRID
+    }
 
-    public record SearchHit(UUID localBookId, String provider, String externalId, String title, List<String> authors,
-                            String coverUrl, String description, double score, String matchType, List<String> matchedBy) {}
+    public record SearchHit(
+            UUID localBookId,
+            String provider,
+            String externalId,
+            String title,
+            List<String> authors,
+            String coverUrl,
+            String description,
+            double score,
+            String matchType,
+            List<String> matchedBy) {}
 
     public record DiscoveryRequest(@NotBlank @Size(max = 1000) String prompt) {}
 

@@ -5,9 +5,8 @@ import com.ailibrary.reading.dto.ReadingDtos.ProgressView;
 import com.ailibrary.reading.dto.ReadingDtos.UpdateRequest;
 import com.ailibrary.reading.service.ReadingProgressService;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.UUID;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/reading")

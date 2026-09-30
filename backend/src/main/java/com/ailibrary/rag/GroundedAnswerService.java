@@ -4,21 +4,21 @@ import com.ailibrary.ai.AiFacade;
 import com.ailibrary.ai.AiPromptTemplates;
 import com.ailibrary.common.error.BadRequestException;
 import com.ailibrary.common.vector.VectorStoreAccess;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-
 /** Explicit retrieve → grounded prompt → answer pipeline shared by document and book chat. */
 @Service
 public class GroundedAnswerService {
-    static final String SYSTEM_PROMPT = """
+    static final String SYSTEM_PROMPT =
+            """
             You answer questions using ONLY the text inside <context>.
             Rules:
             1. If the context does not contain enough evidence, say so plainly instead of guessing.
@@ -39,10 +39,16 @@ public class GroundedAnswerService {
 
     public record Retrieval(Filter.Expression filter, int topK, double similarityThreshold) {}
 
-    public RagAnswer answer(UUID ownerId, String operation, String question, Retrieval retrieval,
-                            String defaultSourceName, String noContextMessage) {
+    public RagAnswer answer(
+            UUID ownerId,
+            String operation,
+            String question,
+            Retrieval retrieval,
+            String defaultSourceName,
+            String noContextMessage) {
         VectorStore store = vectors.store()
-                .orElseThrow(() -> new BadRequestException("AI_DISABLED", "Vector search is unavailable; enable AI to use RAG"));
+                .orElseThrow(() ->
+                        new BadRequestException("AI_DISABLED", "Vector search is unavailable; enable AI to use RAG"));
         List<Document> chunks = retrieve(store, question, retrieval);
         if (chunks.isEmpty()) return new RagAnswer(noContextMessage, List.of());
 
@@ -53,12 +59,17 @@ public class GroundedAnswerService {
             String label = "S" + n++;
             String text = Objects.toString(chunk.getText(), "");
             context.append('[').append(label).append("]\n").append(text).append("\n\n");
-            sources.add(new RagAnswer.RagSource(label,
+            sources.add(new RagAnswer.RagSource(
+                    label,
                     Objects.toString(chunk.getMetadata().get("sourceName"), defaultSourceName),
                     Objects.toString(chunk.getMetadata().get("chunkIndex"), ""),
                     text.substring(0, Math.min(SNIPPET_CHARS, text.length()))));
         }
-        String answer = ai.complete(ownerId, operation, SYSTEM_PROMPT, prompts.groundedQuestion(question, context.toString().trim()));
+        String answer = ai.complete(
+                ownerId,
+                operation,
+                SYSTEM_PROMPT,
+                prompts.groundedQuestion(question, context.toString().trim()));
         return new RagAnswer(answer, sources);
     }
 

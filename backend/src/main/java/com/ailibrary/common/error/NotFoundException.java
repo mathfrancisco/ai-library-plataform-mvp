@@ -11,6 +11,11 @@ public class NotFoundException extends ApiException {
         super(HttpStatus.NOT_FOUND, code, message);
     }
 
-    public static NotFoundException book() { return new NotFoundException("BOOK_NOT_FOUND", "Book not found"); }
-    public static NotFoundException document() { return new NotFoundException("DOCUMENT_NOT_FOUND", "Document not found"); }
+    public static NotFoundException book() {
+        return new NotFoundException("BOOK_NOT_FOUND", "Book not found");
+    }
+
+    public static NotFoundException document() {
+        return new NotFoundException("DOCUMENT_NOT_FOUND", "Document not found");
+    }
 }

@@ -7,9 +7,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/search")
@@ -23,15 +22,17 @@ public class SearchController {
     }
 
     @GetMapping
-    public List<SearchHit> search(@RequestParam @NotBlank @Size(max = 300) String q,
-                                  @RequestParam(defaultValue = "HYBRID") SearchMode mode,
-                                  @RequestParam(defaultValue = "20") @Min(1) @Max(50) int limit) {
+    public List<SearchHit> search(
+            @RequestParam @NotBlank @Size(max = 300) String q,
+            @RequestParam(defaultValue = "HYBRID") SearchMode mode,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int limit) {
         return service.search(q, mode, limit);
     }
 
     @PostMapping("/discover")
-    public DiscoveryResponse discover(@Valid @RequestBody DiscoveryRequest request,
-                                      @RequestParam(defaultValue = "20") @Min(1) @Max(50) int limit) {
+    public DiscoveryResponse discover(
+            @Valid @RequestBody DiscoveryRequest request,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int limit) {
         return service.discover(currentUser.id(), request.prompt(), limit);
     }
 }

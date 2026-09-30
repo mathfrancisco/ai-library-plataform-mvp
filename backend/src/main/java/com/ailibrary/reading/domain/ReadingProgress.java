@@ -1,7 +1,6 @@
 package com.ailibrary.reading.domain;
 
 import jakarta.persistence.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -41,7 +40,8 @@ public class ReadingProgress {
         this.bookId = bookId;
     }
 
-    public void update(Integer currentPage, BigDecimal percentage, LocalDate startedAt, LocalDate completedAt, String notes) {
+    public void update(
+            Integer currentPage, BigDecimal percentage, LocalDate startedAt, LocalDate completedAt, String notes) {
         if (currentPage != null) this.currentPage = currentPage;
         if (percentage != null) this.percentage = percentage;
         if (startedAt != null) this.startedAt = startedAt;
@@ -49,12 +49,35 @@ public class ReadingProgress {
         if (notes != null) this.notes = notes;
     }
 
-    public UUID getId() { return id; }
-    public UUID getUserId() { return userId; }
-    public UUID getBookId() { return bookId; }
-    public int getCurrentPage() { return currentPage; }
-    public BigDecimal getPercentage() { return percentage; }
-    public LocalDate getStartedAt() { return startedAt; }
-    public LocalDate getCompletedAt() { return completedAt; }
-    public String getNotes() { return notes; }
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public UUID getBookId() {
+        return bookId;
+    }
+
+    public int getCurrentPage() {
+        return currentPage;
+    }
+
+    public BigDecimal getPercentage() {
+        return percentage;
+    }
+
+    public LocalDate getStartedAt() {
+        return startedAt;
+    }
+
+    public LocalDate getCompletedAt() {
+        return completedAt;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
 }

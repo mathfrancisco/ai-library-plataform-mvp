@@ -1,14 +1,13 @@
 package com.ailibrary.common.security;
 
 import com.ailibrary.auth.domain.User;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
-
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 
 @Service
 public class JwtService {
@@ -24,7 +23,9 @@ public class JwtService {
         }
         SecretKey key = new SecretKeySpec(bytes, "HmacSHA256");
         this.encoder = new NimbusJwtEncoder(new com.nimbusds.jose.jwk.source.ImmutableSecret<>(key));
-        this.decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
+        this.decoder = NimbusJwtDecoder.withSecretKey(key)
+                .macAlgorithm(MacAlgorithm.HS256)
+                .build();
     }
 
     public String issueAccessToken(User user) {

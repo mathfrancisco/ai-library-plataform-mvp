@@ -2,11 +2,10 @@ package com.ailibrary.book.controller;
 
 import com.ailibrary.book.dto.BookView;
 import com.ailibrary.book.dto.CreateBookRequest;
-import jakarta.validation.Valid;
 import com.ailibrary.book.service.BookService;
-import org.springframework.web.bind.annotation.*;
-
+import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/books")
@@ -25,7 +24,7 @@ public class BookController {
     }
 
     @GetMapping("/{id}/similar")
-    public java.util.List<BookView> similar(@PathVariable UUID id, @RequestParam(defaultValue="8") int limit) {
+    public java.util.List<BookView> similar(@PathVariable UUID id, @RequestParam(defaultValue = "8") int limit) {
         return similar.similar(id, Math.max(1, Math.min(limit, 24)));
     }
 

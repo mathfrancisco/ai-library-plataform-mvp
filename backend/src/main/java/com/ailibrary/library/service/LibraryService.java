@@ -10,10 +10,9 @@ import com.ailibrary.library.dto.LibraryDtos.LibraryItemView;
 import com.ailibrary.library.dto.LibraryDtos.UpsertRequest;
 import com.ailibrary.library.repository.UserLibraryRepository;
 import com.ailibrary.reading.service.ReadingProgressService;
+import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
 
 @Service
 public class LibraryService {
@@ -32,8 +31,8 @@ public class LibraryService {
         Book book = books.findById(bookId).orElseThrow(NotFoundException::book);
         Optional<UserLibraryItem> existing = library.findByUserIdAndBookId(userId, bookId);
         LibraryStatus previous = existing.map(UserLibraryItem::getStatus).orElse(null);
-        UserLibraryItem item = existing.orElseGet(() -> new UserLibraryItem(userId, bookId,
-                request.status() == null ? LibraryStatus.WANT_TO_READ : request.status()));
+        UserLibraryItem item = existing.orElseGet(() -> new UserLibraryItem(
+                userId, bookId, request.status() == null ? LibraryStatus.WANT_TO_READ : request.status()));
         item.update(request.status(), request.favorite(), request.rating());
         item = library.save(item);
         if (item.getStatus() != previous) reading.onStatusChanged(userId, bookId, item.getStatus());
@@ -46,8 +45,12 @@ public class LibraryService {
                 ? library.findByUserIdOrderByAddedAtDesc(userId)
                 : library.findByUserIdAndStatusOrderByAddedAtDesc(userId, status);
         Map<UUID, Book> byId = new HashMap<>();
-        books.findAllById(items.stream().map(UserLibraryItem::getBookId).toList()).forEach(b -> byId.put(b.getId(), b));
-        return items.stream().filter(i -> byId.containsKey(i.getBookId())).map(i -> toView(i, byId.get(i.getBookId()))).toList();
+        books.findAllById(items.stream().map(UserLibraryItem::getBookId).toList())
+                .forEach(b -> byId.put(b.getId(), b));
+        return items.stream()
+                .filter(i -> byId.containsKey(i.getBookId()))
+                .map(i -> toView(i, byId.get(i.getBookId())))
+                .toList();
     }
 
     @Transactional
@@ -58,6 +61,7 @@ public class LibraryService {
     }
 
     private LibraryItemView toView(UserLibraryItem item, Book book) {
-        return new LibraryItemView(BookMapper.toView(book), item.getStatus(), item.isFavorite(), item.getRating(), item.getAddedAt());
+        return new LibraryItemView(
+                BookMapper.toView(book), item.getStatus(), item.isFavorite(), item.getRating(), item.getAddedAt());
     }
 }

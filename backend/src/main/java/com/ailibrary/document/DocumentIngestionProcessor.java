@@ -4,6 +4,8 @@ import com.ailibrary.common.vector.VectorFilters;
 import com.ailibrary.common.vector.VectorStoreAccess;
 import com.ailibrary.document.domain.UserDocument;
 import com.ailibrary.document.repository.UserDocumentRepository;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -12,9 +14,6 @@ import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
-
-import java.nio.charset.StandardCharsets;
-import java.util.*;
 
 /**
  * Upload → Tika extraction → whitespace normalization → ~800-token chunks → tenant metadata → pgvector.
@@ -43,7 +42,8 @@ public class DocumentIngestionProcessor {
         docs.save(doc);
         try {
             VectorStore store = vectors.store()
-                    .orElseThrow(() -> new IllegalStateException("AI/embeddings are disabled; enable AI_ENABLED to index documents"));
+                    .orElseThrow(() -> new IllegalStateException(
+                            "AI/embeddings are disabled; enable AI_ENABLED to index documents"));
             List<Document> parsed = new TikaDocumentReader(new FileSystemResource(service.path(doc))).read();
             List<Document> chunks = chunk(doc, parsed);
             if (chunks.isEmpty()) throw new IllegalStateException("No text could be extracted from this file");
@@ -75,7 +75,11 @@ public class DocumentIngestionProcessor {
         for (Document c : splitter.apply(base)) {
             Map<String, Object> metadata = new HashMap<>(c.getMetadata());
             metadata.put("chunkIndex", i);
-            indexed.add(Document.builder().id(chunkId(doc.getId(), i)).text(c.getText()).metadata(metadata).build());
+            indexed.add(Document.builder()
+                    .id(chunkId(doc.getId(), i))
+                    .text(c.getText())
+                    .metadata(metadata)
+                    .build());
             i++;
         }
         return indexed;
@@ -94,7 +98,8 @@ public class DocumentIngestionProcessor {
     /** Collapses runs of spaces/tabs, trims lines and keeps at most one blank line between paragraphs. */
     static String normalizeWhitespace(String text) {
         if (text == null) return "";
-        return text.replace("\r\n", "\n").replace('\r', '\n')
+        return text.replace("\r\n", "\n")
+                .replace('\r', '\n')
                 .replaceAll("[\\t\\x0B\\f\\u00A0 ]+", " ")
                 .replaceAll(" *\n *", "\n")
                 .replaceAll("\n{3,}", "\n\n")
@@ -102,6 +107,7 @@ public class DocumentIngestionProcessor {
     }
 
     static String chunkId(UUID documentId, int index) {
-        return UUID.nameUUIDFromBytes(("doc-" + documentId + "-" + index).getBytes(StandardCharsets.UTF_8)).toString();
+        return UUID.nameUUIDFromBytes(("doc-" + documentId + "-" + index).getBytes(StandardCharsets.UTF_8))
+                .toString();
     }
 }

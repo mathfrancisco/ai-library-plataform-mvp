@@ -1,12 +1,11 @@
 package com.ailibrary.catalog;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 class CatalogProviderMappingTest {
     @Test
@@ -27,8 +26,11 @@ class CatalogProviderMappingTest {
 
     @Test
     void enrichesOpenLibraryBookWithWorkDescription() throws IOException {
-        CatalogBook book = OpenLibraryProvider.mapSearch(CatalogJson.parse(fixture("open-library-search.json"))).items().getFirst();
-        CatalogBook detailed = OpenLibraryProvider.withWorkDetails(book, CatalogJson.parse(fixture("open-library-work.json")));
+        CatalogBook book = OpenLibraryProvider.mapSearch(CatalogJson.parse(fixture("open-library-search.json")))
+                .items()
+                .getFirst();
+        CatalogBook detailed =
+                OpenLibraryProvider.withWorkDetails(book, CatalogJson.parse(fixture("open-library-work.json")));
         assertThat(detailed.description()).isEqualTo("Practical software architecture solutions from Uncle Bob.");
         assertThat(detailed.categories()).containsExactly("Software architecture", "Computer software");
     }

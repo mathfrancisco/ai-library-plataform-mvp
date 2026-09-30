@@ -11,13 +11,12 @@ import com.ailibrary.catalog.CatalogService;
 import com.ailibrary.common.vector.VectorFilters;
 import com.ailibrary.common.vector.VectorStoreAccess;
 import com.ailibrary.search.SearchDtos.*;
+import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Service;
-
-import java.util.*;
 
 /**
  * Weighted reciprocal-rank fusion over three ranked lists: local FTS, local vector similarity
@@ -64,7 +63,9 @@ public class HybridSearchService {
         }
         // Stable ordering: score desc, then title for deterministic ties.
         return merged.values().stream()
-                .sorted(Comparator.comparingDouble(MutableHit::score).reversed().thenComparing(h -> h.title == null ? "" : h.title))
+                .sorted(Comparator.comparingDouble(MutableHit::score)
+                        .reversed()
+                        .thenComparing(h -> h.title == null ? "" : h.title))
                 .limit(limit)
                 .map(MutableHit::toView)
                 .toList();
@@ -73,12 +74,15 @@ public class HybridSearchService {
     public DiscoveryResponse discover(UUID userId, String prompt, int limit) {
         DiscoveryPlan plan;
         try {
-            plan = ai.structured(userId, "DISCOVERY_QUERY",
+            plan = ai.structured(
+                    userId,
+                    "DISCOVERY_QUERY",
                     "Convert a reader request into a concise book-search plan. "
                             + "query must contain provider-friendly keywords (genre, theme, setting, audience). "
                             + "Do not invent specific titles unless the user named them. "
                             + "language is an ISO 639 code when the user asked for one, otherwise null.",
-                    prompt, DiscoveryPlan.class);
+                    prompt,
+                    DiscoveryPlan.class);
         } catch (RuntimeException ex) {
             log.debug("Discovery planning failed, falling back to raw prompt: {}", ex.getMessage());
             plan = new DiscoveryPlan(prompt, null, null, List.of());
@@ -100,10 +104,19 @@ public class HybridSearchService {
         var store = vectors.store();
         if (store.isEmpty()) return List.of();
         try {
-            List<Document> docs = store.get().similaritySearch(SearchRequest.builder().query(query).topK(limit)
-                    .similarityThreshold(SEMANTIC_THRESHOLD).filterExpression(VectorFilters.books()).build());
+            List<Document> docs = store.get()
+                    .similaritySearch(SearchRequest.builder()
+                            .query(query)
+                            .topK(limit)
+                            .similarityThreshold(SEMANTIC_THRESHOLD)
+                            .filterExpression(VectorFilters.books())
+                            .build());
             if (docs == null) return List.of();
-            List<UUID> ids = docs.stream().map(SimilarBookService::bookId).flatMap(Optional::stream).distinct().toList();
+            List<UUID> ids = docs.stream()
+                    .map(SimilarBookService::bookId)
+                    .flatMap(Optional::stream)
+                    .distinct()
+                    .toList();
             Map<UUID, Book> byId = new HashMap<>();
             books.findAllById(ids).forEach(b -> byId.put(b.getId(), b));
             return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
@@ -164,12 +177,24 @@ public class HybridSearchService {
             matchedBy.add(matchType);
         }
 
-        double score() { return score; }
+        double score() {
+            return score;
+        }
 
         SearchHit toView() {
-            String matchType = matchedBy.size() > 1 ? "HYBRID" : matchedBy.iterator().next();
-            return new SearchHit(localBookId, provider, externalId, title, authors == null ? List.of() : authors, cover,
-                    description, score, matchType, List.copyOf(matchedBy));
+            String matchType =
+                    matchedBy.size() > 1 ? "HYBRID" : matchedBy.iterator().next();
+            return new SearchHit(
+                    localBookId,
+                    provider,
+                    externalId,
+                    title,
+                    authors == null ? List.of() : authors,
+                    cover,
+                    description,
+                    score,
+                    matchType,
+                    List.copyOf(matchedBy));
         }
     }
 }

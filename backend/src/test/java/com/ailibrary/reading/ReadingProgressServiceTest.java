@@ -1,5 +1,10 @@
 package com.ailibrary.reading;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.ailibrary.book.domain.Book;
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.error.BadRequestException;
@@ -8,35 +13,31 @@ import com.ailibrary.reading.domain.ReadingProgress;
 import com.ailibrary.reading.dto.ReadingDtos.UpdateRequest;
 import com.ailibrary.reading.repository.ReadingProgressRepository;
 import com.ailibrary.reading.service.ReadingProgressService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.Optional;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class ReadingProgressServiceTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 9, 30);
     private final ReadingProgressRepository repo = mock(ReadingProgressRepository.class);
     private final BookRepository books = mock(BookRepository.class);
     private final UUID user = UUID.randomUUID();
-    private final Book book = new Book(null, null, "Dune", null, "Frank Herbert", null, null, null, null, null, 400, null, false);
+    private final Book book =
+            new Book(null, null, "Dune", null, "Frank Herbert", null, null, null, null, null, 400, null, false);
     private ReadingProgressService service;
 
     @BeforeEach
     void setUp() throws Exception {
-        Constructor<ReadingProgressService> c = ReadingProgressService.class
-                .getDeclaredConstructor(ReadingProgressRepository.class, BookRepository.class, Clock.class);
+        Constructor<ReadingProgressService> c = ReadingProgressService.class.getDeclaredConstructor(
+                ReadingProgressRepository.class, BookRepository.class, Clock.class);
         c.setAccessible(true);
-        service = c.newInstance(repo, books, Clock.fixed(TODAY.atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC));
+        service =
+                c.newInstance(repo, books, Clock.fixed(TODAY.atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC));
         when(books.findById(book.getId())).thenReturn(Optional.of(book));
         when(repo.findByUserIdAndBookId(any(), any())).thenReturn(Optional.empty());
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -53,8 +54,8 @@ class ReadingProgressServiceTest {
     void rejectsPageBeyondBookAndCompletionBeforeStart() {
         assertThatThrownBy(() -> service.upsert(user, book.getId(), new UpdateRequest(401, null, null, null, null)))
                 .isInstanceOf(BadRequestException.class);
-        assertThatThrownBy(() -> service.upsert(user, book.getId(),
-                new UpdateRequest(null, null, TODAY, TODAY.minusDays(1), null)))
+        assertThatThrownBy(() -> service.upsert(
+                        user, book.getId(), new UpdateRequest(null, null, TODAY, TODAY.minusDays(1), null)))
                 .isInstanceOf(BadRequestException.class);
     }
 

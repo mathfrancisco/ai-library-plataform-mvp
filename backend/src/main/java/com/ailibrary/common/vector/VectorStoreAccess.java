@@ -1,11 +1,10 @@
 package com.ailibrary.common.vector;
 
+import java.util.Optional;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import java.util.Optional;
 
 /**
  * Single entry point for vector operations. Every embedding call needs a configured provider,

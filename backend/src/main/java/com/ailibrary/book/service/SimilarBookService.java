@@ -4,11 +4,10 @@ import com.ailibrary.book.dto.BookView;
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.vector.VectorFilters;
 import com.ailibrary.common.vector.VectorStoreAccess;
+import java.util.*;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Service;
-
-import java.util.*;
 
 @Service
 public class SimilarBookService {
@@ -26,11 +25,16 @@ public class SimilarBookService {
         var seed = bookService.getEntity(id);
         var store = vectors.store();
         if (store.isEmpty()) return List.of();
-        String query = seed.getTitle() + " " + Objects.toString(seed.getCategoryNames(), "") + " " + Objects.toString(seed.getDescription(), "");
+        String query = seed.getTitle() + " " + Objects.toString(seed.getCategoryNames(), "") + " "
+                + Objects.toString(seed.getDescription(), "");
         try {
-            List<Document> docs = store.get().similaritySearch(SearchRequest.builder()
-                    .query(query).topK(Math.min(50, limit + 8)).similarityThreshold(.40)
-                    .filterExpression(VectorFilters.books()).build());
+            List<Document> docs = store.get()
+                    .similaritySearch(SearchRequest.builder()
+                            .query(query)
+                            .topK(Math.min(50, limit + 8))
+                            .similarityThreshold(.40)
+                            .filterExpression(VectorFilters.books())
+                            .build());
             LinkedHashSet<UUID> ids = new LinkedHashSet<>();
             for (Document d : docs) {
                 bookId(d).filter(x -> !x.equals(id)).ifPresent(ids::add);

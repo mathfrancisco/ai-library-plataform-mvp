@@ -2,13 +2,13 @@ package com.ailibrary.ai;
 
 import com.ailibrary.library.service.LibraryService;
 import com.ailibrary.reading.service.ReadingProgressService;
-import org.springframework.stereotype.Service;
-
 import java.util.UUID;
+import org.springframework.stereotype.Service;
 
 @Service
 public class AssistantService {
-    static final String SYSTEM_PROMPT = """
+    static final String SYSTEM_PROMPT =
+            """
             You are a personal library assistant.
             Use the provided tools for any factual claim about the user's library or reading progress.
             Never assume ownership or invent book state. Book ids are local UUIDs returned by the tools.

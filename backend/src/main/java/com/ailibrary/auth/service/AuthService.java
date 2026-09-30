@@ -9,11 +9,6 @@ import com.ailibrary.common.error.ApiException;
 import com.ailibrary.common.error.NotFoundException;
 import com.ailibrary.common.security.AuthProperties;
 import com.ailibrary.common.security.JwtService;
-import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -22,6 +17,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -32,8 +31,12 @@ public class AuthService {
     private final AuthProperties properties;
     private final SecureRandom random = new SecureRandom();
 
-    public AuthService(UserRepository users, RefreshTokenRepository refreshTokens, PasswordEncoder passwordEncoder,
-                       JwtService jwtService, AuthProperties properties) {
+    public AuthService(
+            UserRepository users,
+            RefreshTokenRepository refreshTokens,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            AuthProperties properties) {
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.passwordEncoder = passwordEncoder;
@@ -47,7 +50,10 @@ public class AuthService {
         if (users.existsByEmailIgnoreCase(email)) {
             throw new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "Email already registered");
         }
-        User user = new User(email, passwordEncoder.encode(request.password()), request.displayName().trim());
+        User user = new User(
+                email,
+                passwordEncoder.encode(request.password()),
+                request.displayName().trim());
         if (properties.adminEmails().contains(email)) user.promoteToAdmin();
         user = users.save(user);
         return issuePair(user);
@@ -55,8 +61,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        User user = users.findByEmailIgnoreCase(request.email().trim())
-                .orElseThrow(AuthService::invalidCredentials);
+        User user = users.findByEmailIgnoreCase(request.email().trim()).orElseThrow(AuthService::invalidCredentials);
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw invalidCredentials();
         }
@@ -65,13 +70,15 @@ public class AuthService {
 
     @Transactional
     public AuthResponse refresh(RefreshRequest request) {
-        RefreshToken current = refreshTokens.findByTokenHash(hash(request.refreshToken()))
+        RefreshToken current = refreshTokens
+                .findByTokenHash(hash(request.refreshToken()))
                 .orElseThrow(() -> invalidRefresh("Invalid refresh token"));
         if (!current.isUsable()) {
             throw invalidRefresh("Refresh token expired or revoked");
         }
         current.revoke();
-        User user = users.findById(current.getUserId()).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "User not found"));
+        User user = users.findById(current.getUserId())
+                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "User not found"));
         return issuePair(user);
     }
 
@@ -89,16 +96,17 @@ public class AuthService {
     private AuthResponse issuePair(User user) {
         String rawRefresh = randomToken();
         RefreshToken token = new RefreshToken(
-                user.getId(),
-                hash(rawRefresh),
-                Instant.now().plus(properties.refreshTtlDays(), ChronoUnit.DAYS)
-        );
+                user.getId(), hash(rawRefresh), Instant.now().plus(properties.refreshTtlDays(), ChronoUnit.DAYS));
         refreshTokens.save(token);
         return new AuthResponse(jwtService.issueAccessToken(user), rawRefresh, toView(user));
     }
 
     private UserView toView(User user) {
-        return new UserView(user.getId(), user.getEmail(), user.getDisplayName(), user.getRole().name());
+        return new UserView(
+                user.getId(),
+                user.getEmail(),
+                user.getDisplayName(),
+                user.getRole().name());
     }
 
     private static ApiException invalidCredentials() {

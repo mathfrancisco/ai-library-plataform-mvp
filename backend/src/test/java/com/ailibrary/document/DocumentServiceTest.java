@@ -1,27 +1,28 @@
 package com.ailibrary.document;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.common.error.BadRequestException;
 import com.ailibrary.common.error.NotFoundException;
 import com.ailibrary.document.repository.UserDocumentRepository;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 class DocumentServiceTest {
-    @TempDir Path dir;
+    @TempDir
+    Path dir;
+
     private final UserDocumentRepository docs = mock(UserDocumentRepository.class);
     private final BookRepository books = mock(BookRepository.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
@@ -35,11 +36,17 @@ class DocumentServiceTest {
     void storesAllowedFileUnderGeneratedKeyAndPublishesIngestion() throws Exception {
         when(docs.save(any())).thenAnswer(i -> i.getArgument(0));
         UUID owner = UUID.randomUUID();
-        var view = service().upload(owner, null, new MockMultipartFile("file", "../../etc/notes.md", "text/markdown", "# hi".getBytes()));
+        var view = service()
+                .upload(
+                        owner,
+                        null,
+                        new MockMultipartFile("file", "../../etc/notes.md", "text/markdown", "# hi".getBytes()));
         assertThat(view.originalName()).isEqualTo("notes.md");
         try (var files = Files.walk(dir)) {
-            assertThat(files.filter(Files::isRegularFile).toList()).singleElement()
-                    .satisfies(p -> assertThat(p.startsWith(dir.resolve(owner.toString()))).isTrue());
+            assertThat(files.filter(Files::isRegularFile).toList())
+                    .singleElement()
+                    .satisfies(p -> assertThat(p.startsWith(dir.resolve(owner.toString())))
+                            .isTrue());
         }
         verify(events).publishEvent(any(DocumentUploadedEvent.class));
     }
@@ -47,14 +54,25 @@ class DocumentServiceTest {
     @Test
     void rejectsDisallowedExtensionMimeMismatchEmptyAndOversizedFiles() {
         UUID owner = UUID.randomUUID();
-        assertThatThrownBy(() -> service().upload(owner, null, new MockMultipartFile("file", "run.exe", "application/octet-stream", new byte[]{1})))
-                .isInstanceOf(BadRequestException.class).hasMessageContaining("Allowed formats");
-        assertThatThrownBy(() -> service().upload(owner, null, new MockMultipartFile("file", "a.pdf", "text/html", new byte[]{1})))
-                .isInstanceOf(BadRequestException.class).hasMessageContaining("content type");
-        assertThatThrownBy(() -> service().upload(owner, null, new MockMultipartFile("file", "a.txt", "text/plain", new byte[0])))
-                .isInstanceOf(BadRequestException.class).hasMessageContaining("empty");
-        assertThatThrownBy(() -> service().upload(owner, null, new MockMultipartFile("file", "a.txt", "text/plain", new byte[2048])))
-                .isInstanceOf(BadRequestException.class).hasMessageContaining("maximum size");
+        assertThatThrownBy(() -> service()
+                        .upload(
+                                owner,
+                                null,
+                                new MockMultipartFile("file", "run.exe", "application/octet-stream", new byte[] {1})))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Allowed formats");
+        assertThatThrownBy(() -> service()
+                        .upload(owner, null, new MockMultipartFile("file", "a.pdf", "text/html", new byte[] {1})))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("content type");
+        assertThatThrownBy(() -> service()
+                        .upload(owner, null, new MockMultipartFile("file", "a.txt", "text/plain", new byte[0])))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("empty");
+        assertThatThrownBy(() -> service()
+                        .upload(owner, null, new MockMultipartFile("file", "a.txt", "text/plain", new byte[2048])))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("maximum size");
         verifyNoInteractions(events);
     }
 
@@ -62,11 +80,21 @@ class DocumentServiceTest {
     void rejectsFilesWhoseContentDoesNotMatchTheExtension() {
         UUID owner = UUID.randomUUID();
         // Declared type and extension both claim PDF, but the bytes are HTML.
-        assertThatThrownBy(() -> service().upload(owner, null,
-                new MockMultipartFile("file", "paper.pdf", "application/pdf", "<html><script>x</script></html>".getBytes())))
-                .isInstanceOf(BadRequestException.class).hasMessageContaining("does not match its extension");
-        assertThatThrownBy(() -> service().upload(owner, null,
-                new MockMultipartFile("file", "notes.txt", "text/plain", new byte[]{0x50, 0x4B, 0x03, 0x04, 0, 0, 0, 0})))
+        assertThatThrownBy(() -> service()
+                        .upload(
+                                owner,
+                                null,
+                                new MockMultipartFile(
+                                        "file",
+                                        "paper.pdf",
+                                        "application/pdf",
+                                        "<html><script>x</script></html>".getBytes())))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("does not match its extension");
+        assertThatThrownBy(() -> service()
+                        .upload(owner, null, new MockMultipartFile("file", "notes.txt", "text/plain", new byte[] {
+                            0x50, 0x4B, 0x03, 0x04, 0, 0, 0, 0
+                        })))
                 .isInstanceOf(BadRequestException.class);
         verifyNoInteractions(events);
     }
@@ -74,8 +102,15 @@ class DocumentServiceTest {
     @Test
     void acceptsRealPdfBytes() {
         when(docs.save(any())).thenAnswer(i -> i.getArgument(0));
-        var view = service().upload(UUID.randomUUID(), null,
-                new MockMultipartFile("file", "paper.pdf", "application/pdf", "%PDF-1.7\n%âãÏÓ\n1 0 obj<<>>endobj\n".getBytes()));
+        var view = service()
+                .upload(
+                        UUID.randomUUID(),
+                        null,
+                        new MockMultipartFile(
+                                "file",
+                                "paper.pdf",
+                                "application/pdf",
+                                "%PDF-1.7\n%âãÏÓ\n1 0 obj<<>>endobj\n".getBytes()));
         assertThat(view.originalName()).isEqualTo("paper.pdf");
     }
 
