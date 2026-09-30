@@ -1,16 +1,27 @@
 package com.ailibrary.catalog;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import tools.jackson.databind.JsonNode;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+import static com.ailibrary.catalog.CatalogJson.*;
 
 @Component
 @EnableConfigurationProperties(CatalogProperties.class)
 public class OpenLibraryProvider implements BookCatalogProvider {
+    static final String NAME = "open-library";
+    static final String SEARCH_FIELDS = "key,title,subtitle,author_name,isbn,first_publish_year,cover_i,language,publisher,subject,number_of_pages_median,public_scan_b";
+    private static final Pattern WORK_KEY = Pattern.compile("^/works/OL\\d+W$");
+
     private final RestClient client;
+    // Identified clients may send 3 req/s; stay slightly below.
     private final ProviderRequestGate gate = new ProviderRequestGate(350);
 
     public OpenLibraryProvider(RestClient.Builder builder, CatalogProperties properties) {
@@ -20,60 +31,76 @@ public class OpenLibraryProvider implements BookCatalogProvider {
                 .build();
     }
 
-    @Override public String providerName() { return "open-library"; }
+    @Override public String providerName() { return NAME; }
 
     @Override
     public CatalogPage search(String query, int page, int size) {
         gate.awaitTurn();
-        JsonNode root = client.get().uri(uri -> uri.path("/search.json")
+        String body = client.get().uri(uri -> uri.path("/search.json")
                         .queryParam("q", query)
                         .queryParam("page", Math.max(1, page))
                         .queryParam("limit", Math.min(size, 50))
-                        .queryParam("fields", "key,title,subtitle,author_name,isbn,first_publish_year,cover_i,language,publisher,subject,number_of_pages_median")
+                        .queryParam("fields", SEARCH_FIELDS)
                         .build())
-                .retrieve().body(JsonNode.class);
-        if (root == null) return new CatalogPage(List.of(), 0);
+                .retrieve().body(String.class);
+        return mapSearch(parse(body));
+    }
+
+    @Override
+    public Optional<CatalogBook> get(String externalId) {
+        String key = workKey(externalId);
+        if (key == null) return Optional.empty();
+        Optional<CatalogBook> found = search("key:" + key, 1, 1).items().stream().findFirst();
+        return found.map(book -> {
+            try {
+                gate.awaitTurn();
+                String work = client.get().uri(key + ".json").retrieve().body(String.class);
+                return withWorkDetails(book, parse(work));
+            } catch (RestClientException ex) {
+                // The search document is still a valid, if thinner, catalog record.
+                return book;
+            }
+        });
+    }
+
+    static String workKey(String externalId) {
+        if (externalId == null) return null;
+        String key = externalId.trim();
+        if (!key.startsWith("/")) key = "/works/" + key;
+        return WORK_KEY.matcher(key).matches() ? key : null;
+    }
+
+    static CatalogPage mapSearch(JsonNode root) {
         List<CatalogBook> items = new ArrayList<>();
         for (JsonNode doc : root.path("docs")) items.add(map(doc));
         return new CatalogPage(items, root.path("numFound").asLong(items.size()));
     }
 
-    @Override
-    public Optional<CatalogBook> get(String externalId) {
-        String id = externalId.startsWith("/") ? externalId : "/works/" + externalId;
-        CatalogPage page = search("key:" + id, 1, 1);
-        return page.items().stream().findFirst();
-    }
-
-    private CatalogBook map(JsonNode node) {
+    static CatalogBook map(JsonNode node) {
         String key = text(node, "key");
         List<String> isbn = strings(node.path("isbn"));
         String isbn13 = isbn.stream().filter(v -> v.length() == 13).findFirst().orElse(null);
         String isbn10 = isbn.stream().filter(v -> v.length() == 10).findFirst().orElse(null);
-        Integer coverId = node.hasNonNull("cover_i") ? node.get("cover_i").asInt() : null;
+        Integer coverId = integer(node, "cover_i");
         String cover = coverId == null ? null : "https://covers.openlibrary.org/b/id/" + coverId + "-L.jpg";
         return new CatalogBook(
-                providerName(), key, text(node, "title"), text(node, "subtitle"), strings(node.path("author_name")),
-                isbn13, isbn10, null, first(strings(node.path("subject")), 12), first(strings(node.path("language")), 1).stream().findFirst().orElse(null),
-                first(strings(node.path("publisher")), 1).stream().findFirst().orElse(null),
-                node.hasNonNull("first_publish_year") ? node.get("first_publish_year").asInt() : null,
-                node.hasNonNull("number_of_pages_median") ? node.get("number_of_pages_median").asInt() : null,
-                cover, false, key == null ? null : "https://openlibrary.org" + key
+                NAME, key, Optional.ofNullable(text(node, "title")).orElse("Untitled"), text(node, "subtitle"),
+                strings(node.path("author_name")), isbn13, isbn10, null,
+                strings(node.path("subject")).stream().limit(12).toList(),
+                strings(node.path("language")).stream().findFirst().orElse(null),
+                strings(node.path("publisher")).stream().findFirst().orElse(null),
+                integer(node, "first_publish_year"), integer(node, "number_of_pages_median"),
+                cover, node.path("public_scan_b").asBoolean(false), key == null ? null : "https://openlibrary.org" + key
         );
     }
 
-    private String text(JsonNode n, String field) {
-        return n.hasNonNull(field) ? n.get(field).asText() : null;
-    }
-
-    private List<String> strings(JsonNode node) {
-        if (!node.isArray()) return List.of();
-        List<String> values = new ArrayList<>();
-        node.forEach(v -> { if (v.isTextual() && !v.asText().isBlank()) values.add(v.asText()); });
-        return values;
-    }
-
-    private List<String> first(List<String> values, int max) {
-        return values.stream().limit(max).toList();
+    /** Work records carry the description, which search results do not. */
+    static CatalogBook withWorkDetails(CatalogBook book, JsonNode work) {
+        JsonNode raw = work.path("description");
+        String description = raw.isObject() ? text(raw, "value") : (raw.isString() ? raw.asString() : null);
+        List<String> subjects = book.categories().isEmpty() ? strings(work.path("subjects")).stream().limit(12).toList() : book.categories();
+        return new CatalogBook(book.provider(), book.externalId(), book.title(), book.subtitle(), book.authors(), book.isbn13(),
+                book.isbn10(), description == null ? book.description() : description.strip(), subjects, book.language(), book.publisher(),
+                book.publishedYear(), book.pageCount(), book.coverUrl(), book.publicDomain(), book.sourceUrl());
     }
 }

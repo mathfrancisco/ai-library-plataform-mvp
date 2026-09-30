@@ -24,8 +24,8 @@ public class User {
     @Column(nullable = false)
     private Role role = Role.USER;
 
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt = Instant.now();
 
     protected User() {}
 
@@ -36,6 +36,8 @@ public class User {
         this.displayName = displayName;
         this.role = Role.USER;
     }
+
+    public void promoteToAdmin() { this.role = Role.ADMIN; }
 
     public UUID getId() { return id; }
     public String getEmail() { return email; }

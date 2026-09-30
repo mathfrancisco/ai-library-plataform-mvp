@@ -16,7 +16,7 @@ public class AiGeneration {
     private String provider;
     private String model;
     @Column(nullable=false, columnDefinition="text") private String result;
-    @Column(name="created_at", nullable=false, insertable=false, updatable=false) private Instant createdAt;
+    @Column(name="created_at", nullable=false, updatable=false) private Instant createdAt = Instant.now();
     protected AiGeneration() {}
     public AiGeneration(UUID userId,String entityType,UUID entityId,String promptType,String promptHash,String provider,String model,String result){
         this.id=UUID.randomUUID(); this.userId=userId; this.entityType=entityType; this.entityId=entityId; this.promptType=promptType;

@@ -3,71 +3,173 @@ package com.ailibrary.search;
 import com.ailibrary.ai.AiFacade;
 import com.ailibrary.book.domain.Book;
 import com.ailibrary.book.repository.BookRepository;
+import com.ailibrary.book.service.BookFingerprint;
 import com.ailibrary.book.service.BookMapper;
+import com.ailibrary.book.service.SimilarBookService;
 import com.ailibrary.catalog.CatalogBook;
 import com.ailibrary.catalog.CatalogService;
+import com.ailibrary.common.vector.VectorFilters;
+import com.ailibrary.common.vector.VectorStoreAccess;
 import com.ailibrary.search.SearchDtos.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+/**
+ * Weighted reciprocal-rank fusion over three ranked lists: local FTS, local vector similarity
+ * and the federated external catalog. Hits are merged by the shared book fingerprint so a book
+ * found both locally and externally appears once, keeping its local id.
+ */
 @Service
 public class HybridSearchService {
-    private final BookRepository books; private final CatalogService catalog; private final ObjectProvider<VectorStore> vectorStore; private final AiFacade ai;
-    public HybridSearchService(BookRepository books, CatalogService catalog, ObjectProvider<VectorStore> vectorStore, AiFacade ai){ this.books=books; this.catalog=catalog; this.vectorStore=vectorStore; this.ai=ai; }
+    private static final Logger log = LoggerFactory.getLogger(HybridSearchService.class);
+    static final int RRF_K = 60;
+    static final double LEXICAL_WEIGHT = 1.0;
+    static final double SEMANTIC_WEIGHT = 1.2;
+    static final double EXTERNAL_WEIGHT = 0.8;
+    static final double SEMANTIC_THRESHOLD = 0.45;
 
-    public List<SearchHit> search(String query, SearchMode mode, int limit){
-        Map<String, MutableHit> merged = new LinkedHashMap<>();
-        if(mode!=SearchMode.SEMANTIC) addLexical(query,limit,merged);
-        if(mode!=SearchMode.LEXICAL) addSemantic(query,limit,merged);
-        if(mode==SearchMode.HYBRID || mode==SearchMode.LEXICAL) addExternal(query,limit,merged);
-        return merged.values().stream().sorted(Comparator.comparingDouble(MutableHit::score).reversed()).limit(limit).map(MutableHit::toView).toList();
+    private final BookRepository books;
+    private final CatalogService catalog;
+    private final VectorStoreAccess vectors;
+    private final AiFacade ai;
+
+    public HybridSearchService(BookRepository books, CatalogService catalog, VectorStoreAccess vectors, AiFacade ai) {
+        this.books = books;
+        this.catalog = catalog;
+        this.vectors = vectors;
+        this.ai = ai;
     }
 
-    public DiscoveryResponse discover(UUID userId, String prompt, int limit){
+    public List<SearchHit> search(String query, SearchMode mode, int limit) {
+        String q = query.trim();
+        List<Book> lexical = mode == SearchMode.SEMANTIC ? List.of() : lexical(q, limit);
+        List<Book> semantic = mode == SearchMode.LEXICAL ? List.of() : semantic(q, limit);
+        List<CatalogBook> external = mode == SearchMode.SEMANTIC ? List.of() : external(q, limit);
+        return fuse(lexical, semantic, external, limit);
+    }
+
+    static List<SearchHit> fuse(List<Book> lexical, List<Book> semantic, List<CatalogBook> external, int limit) {
+        Map<String, MutableHit> merged = new LinkedHashMap<>();
+        addLocal(lexical, "LEXICAL", LEXICAL_WEIGHT, merged);
+        addLocal(semantic, "SEMANTIC", SEMANTIC_WEIGHT, merged);
+        int rank = 1;
+        for (CatalogBook b : external) {
+            String key = BookFingerprint.of(b.isbn13(), b.isbn10(), b.title(), b.authors());
+            merged.computeIfAbsent(key, k -> MutableHit.external(b)).add(rrf(rank++, EXTERNAL_WEIGHT), "EXTERNAL");
+        }
+        // Stable ordering: score desc, then title for deterministic ties.
+        return merged.values().stream()
+                .sorted(Comparator.comparingDouble(MutableHit::score).reversed().thenComparing(h -> h.title == null ? "" : h.title))
+                .limit(limit)
+                .map(MutableHit::toView)
+                .toList();
+    }
+
+    public DiscoveryResponse discover(UUID userId, String prompt, int limit) {
         DiscoveryPlan plan;
         try {
-            plan=ai.structured(userId,"DISCOVERY_QUERY", "Convert a reader request into a concise book-search plan. query should contain provider-friendly keywords. Do not invent specific titles unless user named them.", prompt, DiscoveryPlan.class);
-        } catch(RuntimeException ex){ plan=new DiscoveryPlan(prompt,null,null,List.of()); }
-        return new DiscoveryResponse(plan, search(plan.query()==null?prompt:plan.query(), SearchMode.HYBRID, limit));
+            plan = ai.structured(userId, "DISCOVERY_QUERY",
+                    "Convert a reader request into a concise book-search plan. "
+                            + "query must contain provider-friendly keywords (genre, theme, setting, audience). "
+                            + "Do not invent specific titles unless the user named them. "
+                            + "language is an ISO 639 code when the user asked for one, otherwise null.",
+                    prompt, DiscoveryPlan.class);
+        } catch (RuntimeException ex) {
+            log.debug("Discovery planning failed, falling back to raw prompt: {}", ex.getMessage());
+            plan = new DiscoveryPlan(prompt, null, null, List.of());
+        }
+        String query = plan.query() == null || plan.query().isBlank() ? prompt : plan.query();
+        return new DiscoveryResponse(plan, search(query, SearchMode.HYBRID, limit));
     }
 
-    private void addLexical(String query,int limit,Map<String,MutableHit> out){
-        List<Book> rows=books.lexicalSearch(query,limit); int rank=1;
-        for(Book b:rows){ String key="local:"+b.getId(); out.computeIfAbsent(key,k->MutableHit.local(b,"LEXICAL")).add(rrf(rank++,1.0)); }
-    }
-    private void addSemantic(String query,int limit,Map<String,MutableHit> out){
-        VectorStore store=vectorStore.getIfAvailable(); if(store==null)return;
+    private List<Book> lexical(String query, int limit) {
         try {
-            List<Document> docs=store.similaritySearch(SearchRequest.builder().query(query).topK(limit).similarityThreshold(0.45).filterExpression("type == 'book'").build());
-            if(docs==null)return; int rank=1;
-            for(Document d:docs){
-                int currentRank = rank++;
-                Object raw=d.getMetadata().get("bookId");
-                if(raw==null) continue;
-                try{
-                    UUID id=UUID.fromString(raw.toString());
-                    books.findById(id).ifPresent(b -> out.computeIfAbsent("local:"+id,k->MutableHit.local(b,"SEMANTIC")).add(rrf(currentRank,1.2)));
-                }catch(Exception ignored){}
-            }
-        } catch(RuntimeException ignored){}
+            return books.lexicalSearch(query, limit);
+        } catch (RuntimeException ex) {
+            log.warn("Lexical search failed: {}", ex.getMessage());
+            return List.of();
+        }
     }
-    private void addExternal(String query,int limit,Map<String,MutableHit> out){
-        int rank=1; for(CatalogBook b:catalog.search(query,1,limit).items()){ String key=fingerprint(b); MutableHit hit=out.computeIfAbsent(key,k->MutableHit.external(b)); hit.add(rrf(rank++,0.8)); }
-    }
-    private double rrf(int rank,double weight){ return weight/(60.0+rank); }
-    private String fingerprint(CatalogBook b){ if(b.isbn13()!=null)return "isbn:"+b.isbn13(); String a=b.authors()==null||b.authors().isEmpty()?"":b.authors().getFirst(); return (b.title()+"::"+a).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]",""); }
 
-    private static class MutableHit {
-        UUID localBookId; String provider,externalId,title,cover,description,matchType; List<String> authors; double score;
-        static MutableHit local(Book b,String match){ var h=new MutableHit(); h.localBookId=b.getId(); h.provider="local"; h.title=b.getTitle(); h.authors=BookMapper.toView(b).authors(); h.cover=b.getCoverUrl(); h.description=b.getDescription(); h.matchType=match; return h; }
-        static MutableHit external(CatalogBook b){ var h=new MutableHit(); h.provider=b.provider(); h.externalId=b.externalId(); h.title=b.title(); h.authors=b.authors(); h.cover=b.coverUrl(); h.description=b.description(); h.matchType="EXTERNAL"; return h; }
-        void add(double value){ score+=value; }
-        double score(){return score;}
-        SearchHit toView(){ return new SearchHit(localBookId,provider,externalId,title,authors==null?List.of():authors,cover,description,score,matchType); }
+    private List<Book> semantic(String query, int limit) {
+        var store = vectors.store();
+        if (store.isEmpty()) return List.of();
+        try {
+            List<Document> docs = store.get().similaritySearch(SearchRequest.builder().query(query).topK(limit)
+                    .similarityThreshold(SEMANTIC_THRESHOLD).filterExpression(VectorFilters.books()).build());
+            if (docs == null) return List.of();
+            List<UUID> ids = docs.stream().map(SimilarBookService::bookId).flatMap(Optional::stream).distinct().toList();
+            Map<UUID, Book> byId = new HashMap<>();
+            books.findAllById(ids).forEach(b -> byId.put(b.getId(), b));
+            return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
+        } catch (RuntimeException ex) {
+            log.warn("Semantic search failed: {}", ex.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<CatalogBook> external(String query, int limit) {
+        return catalog.search(query, 1, limit).items();
+    }
+
+    private static void addLocal(List<Book> ranked, String matchType, double weight, Map<String, MutableHit> out) {
+        int rank = 1;
+        for (Book b : ranked) {
+            var view = BookMapper.toView(b);
+            String key = BookFingerprint.of(b.getIsbn13(), b.getIsbn10(), b.getTitle(), view.authors());
+            out.computeIfAbsent(key, k -> MutableHit.local(b)).add(rrf(rank++, weight), matchType);
+        }
+    }
+
+    static double rrf(int rank, double weight) {
+        return weight / (RRF_K + rank);
+    }
+
+    private static final class MutableHit {
+        UUID localBookId;
+        String provider, externalId, title, cover, description;
+        List<String> authors;
+        final LinkedHashSet<String> matchedBy = new LinkedHashSet<>();
+        double score;
+
+        static MutableHit local(Book b) {
+            var h = new MutableHit();
+            h.localBookId = b.getId();
+            h.provider = "local";
+            h.title = b.getTitle();
+            h.authors = BookMapper.toView(b).authors();
+            h.cover = b.getCoverUrl();
+            h.description = b.getDescription();
+            return h;
+        }
+
+        static MutableHit external(CatalogBook b) {
+            var h = new MutableHit();
+            h.provider = b.provider();
+            h.externalId = b.externalId();
+            h.title = b.title();
+            h.authors = b.authors();
+            h.cover = b.coverUrl();
+            h.description = b.description();
+            return h;
+        }
+
+        void add(double value, String matchType) {
+            score += value;
+            matchedBy.add(matchType);
+        }
+
+        double score() { return score; }
+
+        SearchHit toView() {
+            String matchType = matchedBy.size() > 1 ? "HYBRID" : matchedBy.iterator().next();
+            return new SearchHit(localBookId, provider, externalId, title, authors == null ? List.of() : authors, cover,
+                    description, score, matchType, List.copyOf(matchedBy));
+        }
     }
 }

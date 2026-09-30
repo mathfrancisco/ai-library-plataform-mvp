@@ -47,8 +47,8 @@ public class Book {
     @Column(name = "public_domain", nullable = false)
     private boolean publicDomain;
 
-    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
-    private Instant createdAt;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt = Instant.now();
 
     protected Book() {}
 

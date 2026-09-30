@@ -1,0 +1,2 @@
+import type {RagAnswer} from "@/types/api";
+export function RagAnswerView({answer}:{answer:RagAnswer}){return <div style={{marginTop:20}}><p style={{whiteSpace:"pre-wrap",lineHeight:1.6}}>{answer.answer}</p>{answer.sources.length>0&&<p className="eyebrow" style={{marginTop:16}}>Sources</p>}{answer.sources.map(s=><div className="panel" key={s.label} style={{marginTop:8,padding:12}}><b>[{s.label}] {s.source}</b>{s.chunkIndex!==""&&<span className="muted"> · chunk {s.chunkIndex}</span>}<p className="muted">{s.snippet}{s.snippet.length>=280?"…":""}</p></div>)}</div>}

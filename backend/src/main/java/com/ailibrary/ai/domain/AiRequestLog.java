@@ -17,7 +17,7 @@ public class AiRequestLog {
     @Column(name="latency_ms", nullable=false) private long latencyMs;
     @Column(nullable=false) private boolean success;
     @Column(name="error_type") private String errorType;
-    @Column(name="created_at", nullable=false, insertable=false, updatable=false) private Instant createdAt;
+    @Column(name="created_at", nullable=false, updatable=false) private Instant createdAt = Instant.now();
     protected AiRequestLog() {}
     public AiRequestLog(UUID userId,String operation,String provider,String model,Integer inputTokens,Integer outputTokens,long latencyMs,boolean success,String errorType){
         this.id=UUID.randomUUID(); this.userId=userId; this.operation=operation; this.provider=provider; this.model=model;

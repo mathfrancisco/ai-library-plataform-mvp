@@ -17,7 +17,7 @@ public class UserDocument {
  @Enumerated(EnumType.STRING) @Column(nullable=false) private DocumentStatus status;
  @Column(name="error_message",columnDefinition="text") private String errorMessage;
  @Column(name="chunk_count",nullable=false) private int chunkCount;
- @Column(name="created_at",nullable=false,insertable=false,updatable=false) private Instant createdAt;
+ @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt=Instant.now();
  protected UserDocument(){}
  public UserDocument(UUID ownerId,UUID bookId,String originalName,String contentType,long sizeBytes,String storageKey){this.id=UUID.randomUUID();this.ownerId=ownerId;this.bookId=bookId;this.originalName=originalName;this.contentType=contentType;this.sizeBytes=sizeBytes;this.storageKey=storageKey;this.status=DocumentStatus.STORED;}
  public UUID getId(){return id;} public UUID getOwnerId(){return ownerId;} public UUID getBookId(){return bookId;} public String getOriginalName(){return originalName;} public String getContentType(){return contentType;} public long getSizeBytes(){return sizeBytes;} public String getStorageKey(){return storageKey;} public DocumentStatus getStatus(){return status;} public String getErrorMessage(){return errorMessage;} public int getChunkCount(){return chunkCount;} public Instant getCreatedAt(){return createdAt;}

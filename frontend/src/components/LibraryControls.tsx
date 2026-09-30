@@ -1,0 +1,6 @@
+"use client";
+import {LIBRARY_STATUSES,type LibraryStatus} from "@/types/api";
+export type LibraryPatch={status?:LibraryStatus;favorite?:boolean;rating?:number};
+export function StatusSelect({value,onChange,disabled}:{value:LibraryStatus;onChange:(s:LibraryStatus)=>void;disabled?:boolean}){return <select aria-label="Reading status" className="select" style={{maxWidth:170,padding:"8px 10px"}} value={value} disabled={disabled} onChange={e=>onChange(e.target.value as LibraryStatus)}>{LIBRARY_STATUSES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</select>}
+export function FavoriteToggle({value,onChange,disabled}:{value:boolean;onChange:(v:boolean)=>void;disabled?:boolean}){return <button type="button" aria-pressed={value} aria-label={value?"Remove from favorites":"Mark as favorite"} className={`fav ${value?"on":""}`} disabled={disabled} onClick={()=>onChange(!value)}>{value?"♥":"♡"}</button>}
+export function Rating({value,onChange,disabled}:{value?:number;onChange:(v:number)=>void;disabled?:boolean}){return <span className="stars" role="group" aria-label="Rating">{[1,2,3,4,5].map(n=><button type="button" key={n} aria-label={`Rate ${n}`} aria-pressed={(value??0)>=n} className={(value??0)>=n?"on":""} disabled={disabled} onClick={()=>onChange(n)}>★</button>)}</span>}

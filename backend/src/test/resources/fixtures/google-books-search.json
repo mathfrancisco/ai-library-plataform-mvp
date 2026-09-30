@@ -1,0 +1,25 @@
+{
+  "totalItems": 1,
+  "items": [
+    {
+      "id": "abc123",
+      "volumeInfo": {
+        "title": "Domain-Driven Design",
+        "authors": ["Eric Evans"],
+        "publisher": "Addison-Wesley",
+        "publishedDate": "2003-08-22",
+        "description": "Tackling complexity in the heart of software.",
+        "industryIdentifiers": [
+          {"type": "ISBN_10", "identifier": "0321125215"},
+          {"type": "ISBN_13", "identifier": "9780321125217"}
+        ],
+        "pageCount": 560,
+        "categories": ["Computers"],
+        "imageLinks": {"thumbnail": "http://books.google.com/cover.jpg"},
+        "language": "en",
+        "infoLink": "https://books.google.com/books?id=abc123"
+      },
+      "accessInfo": {"publicDomain": false}
+    }
+  ]
+}

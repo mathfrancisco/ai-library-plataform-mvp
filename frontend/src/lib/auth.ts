@@ -1,7 +1,13 @@
 "use client";
-const A="ailib.access",R="ailib.refresh";
+import {useSyncExternalStore} from "react";
+const A="ailib.access",R="ailib.refresh",EVENT="ailib:auth";
+function read(key:string){if(typeof window==="undefined")return null;try{return localStorage.getItem(key)}catch{return null}}
+function notify(){if(typeof window!=="undefined")window.dispatchEvent(new Event(EVENT))}
 export const auth={
- access:()=>typeof window==="undefined"?null:localStorage.getItem(A), refresh:()=>typeof window==="undefined"?null:localStorage.getItem(R),
- save:(accessToken:string,refreshToken:string)=>{localStorage.setItem(A,accessToken);localStorage.setItem(R,refreshToken)},
- clear:()=>{localStorage.removeItem(A);localStorage.removeItem(R)}
+ access:()=>read(A), refresh:()=>read(R),
+ save:(accessToken:string,refreshToken:string)=>{localStorage.setItem(A,accessToken);localStorage.setItem(R,refreshToken);notify()},
+ clear:()=>{localStorage.removeItem(A);localStorage.removeItem(R);notify()}
 };
+function subscribe(cb:()=>void){window.addEventListener(EVENT,cb);window.addEventListener("storage",cb);return()=>{window.removeEventListener(EVENT,cb);window.removeEventListener("storage",cb)}}
+/** True when a session token is stored; false during SSR. */
+export function useSignedIn(){return useSyncExternalStore(subscribe,()=>auth.access()!==null,()=>false)}

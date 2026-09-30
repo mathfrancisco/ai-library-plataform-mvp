@@ -26,6 +26,9 @@ flowchart LR
   I --> J[Document status = READY]
 ```
 
+Ingestion runs asynchronously in-process. Documents left in `STORED`/`PROCESSING` by a restart are re-queued on startup;
+a durable queue is a later scale step (docs/12-deployment.md).
+
 ### Chunking defaults
 
 - Target: ~800 tokens (Spring AI default-aligned).

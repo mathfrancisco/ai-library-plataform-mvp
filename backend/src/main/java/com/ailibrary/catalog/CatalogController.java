@@ -1,6 +1,7 @@
 package com.ailibrary.catalog;
 
 import com.ailibrary.book.dto.BookView;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -25,7 +26,7 @@ public class CatalogController {
     public record ImportRequest(@NotBlank String provider, @NotBlank String externalId) {}
 
     @PostMapping("/import")
-    public BookView importBook(@RequestBody ImportRequest request) {
+    public BookView importBook(@Valid @RequestBody ImportRequest request) {
         return catalog.importBook(request.provider(), request.externalId());
     }
 }

@@ -5,10 +5,11 @@ import com.ailibrary.auth.domain.User;
 import com.ailibrary.auth.dto.AuthDtos.*;
 import com.ailibrary.auth.repository.RefreshTokenRepository;
 import com.ailibrary.auth.repository.UserRepository;
-import com.ailibrary.common.error.BadRequestException;
+import com.ailibrary.common.error.ApiException;
 import com.ailibrary.common.error.NotFoundException;
 import com.ailibrary.common.security.AuthProperties;
 import com.ailibrary.common.security.JwtService;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,18 +45,20 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         String email = request.email().trim().toLowerCase();
         if (users.existsByEmailIgnoreCase(email)) {
-            throw new BadRequestException("Email already registered");
+            throw new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "Email already registered");
         }
-        User user = users.save(new User(email, passwordEncoder.encode(request.password()), request.displayName().trim()));
+        User user = new User(email, passwordEncoder.encode(request.password()), request.displayName().trim());
+        if (properties.adminEmails().contains(email)) user.promoteToAdmin();
+        user = users.save(user);
         return issuePair(user);
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
         User user = users.findByEmailIgnoreCase(request.email().trim())
-                .orElseThrow(() -> new BadRequestException("Invalid credentials"));
+                .orElseThrow(AuthService::invalidCredentials);
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new BadRequestException("Invalid credentials");
+            throw invalidCredentials();
         }
         return issuePair(user);
     }
@@ -63,12 +66,12 @@ public class AuthService {
     @Transactional
     public AuthResponse refresh(RefreshRequest request) {
         RefreshToken current = refreshTokens.findByTokenHash(hash(request.refreshToken()))
-                .orElseThrow(() -> new BadRequestException("Invalid refresh token"));
+                .orElseThrow(() -> invalidRefresh("Invalid refresh token"));
         if (!current.isUsable()) {
-            throw new BadRequestException("Refresh token expired or revoked");
+            throw invalidRefresh("Refresh token expired or revoked");
         }
         current.revoke();
-        User user = users.findById(current.getUserId()).orElseThrow(() -> new NotFoundException("User not found"));
+        User user = users.findById(current.getUserId()).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "User not found"));
         return issuePair(user);
     }
 
@@ -79,7 +82,7 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public UserView getUser(UUID id) {
-        User user = users.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
+        User user = users.findById(id).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "User not found"));
         return toView(user);
     }
 
@@ -96,6 +99,14 @@ public class AuthService {
 
     private UserView toView(User user) {
         return new UserView(user.getId(), user.getEmail(), user.getDisplayName(), user.getRole().name());
+    }
+
+    private static ApiException invalidCredentials() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid credentials");
+    }
+
+    private static ApiException invalidRefresh(String message) {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", message);
     }
 
     private String randomToken() {
