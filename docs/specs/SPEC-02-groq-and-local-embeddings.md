@@ -40,7 +40,7 @@ spring:
       base-url: ${GROQ_BASE_URL:https://api.groq.com/openai}
       chat:
         options:
-          model: ${AI_MODEL_SMART:llama-3.3-70b-versatile}
+          model: ${AI_MODEL_SMART:openai/gpt-oss-120b}
           temperature: 0.2
     embedding:
       transformer:
@@ -54,8 +54,8 @@ app:
     enabled: ${AI_ENABLED:false}
     provider: groq
     models:
-      fast: ${AI_MODEL_FAST:llama-3.1-8b-instant}
-      smart: ${AI_MODEL_SMART:llama-3.3-70b-versatile}
+      fast: ${AI_MODEL_FAST:openai/gpt-oss-20b}
+      smart: ${AI_MODEL_SMART:openai/gpt-oss-120b}
     rate-limit-per-minute: ${AI_RATE_LIMIT_PER_MINUTE:20}
 ```
 Verify exact property names for Spring AI 2.0.1 with Context7 before coding (`spring.ai.model.*` selectors and transformer cache keys).

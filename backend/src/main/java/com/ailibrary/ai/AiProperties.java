@@ -12,8 +12,8 @@ public record AiProperties(
         if (provider == null || provider.isBlank()) provider = "groq";
         if (models == null) models = new Models(null, null);
         models = new Models(
-                models.fast() == null || models.fast().isBlank() ? "llama-3.1-8b-instant" : models.fast(),
-                models.smart() == null || models.smart().isBlank() ? "llama-3.3-70b-versatile" : models.smart());
+                models.fast() == null || models.fast().isBlank() ? "openai/gpt-oss-20b" : models.fast(),
+                models.smart() == null || models.smart().isBlank() ? "openai/gpt-oss-120b" : models.smart());
         if (rateLimitPerMinute == null || rateLimitPerMinute < 1) rateLimitPerMinute = 20;
         if (globalRatePerMinute == null || globalRatePerMinute < 1) globalRatePerMinute = 25;
     }

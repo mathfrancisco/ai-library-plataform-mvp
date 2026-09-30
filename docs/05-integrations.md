@@ -52,8 +52,8 @@ embeddings run locally (see [06-spring-ai-rag.md](06-spring-ai-rag.md) and
 
 | Tier | Default model | Used by |
 |---|---|---|
-| `FAST` | `llama-3.1-8b-instant` (`AI_MODEL_FAST`) | book summaries, first discovery attempt |
-| `SMART` | `llama-3.3-70b-versatile` (`AI_MODEL_SMART`) | RAG answers, assistant tool calling, discovery retry |
+| `FAST` | `openai/gpt-oss-20b` (`AI_MODEL_FAST`) | book summaries, first discovery attempt |
+| `SMART` | `openai/gpt-oss-120b` (`AI_MODEL_SMART`) | RAG answers, assistant tool calling, discovery retry |
 
 Limits on our side (free-tier friendly, both configurable):
 

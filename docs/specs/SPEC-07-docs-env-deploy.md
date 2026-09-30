@@ -20,8 +20,8 @@ APP_CORS_ORIGINS=http://localhost:3000
 AI_ENABLED=false
 GROQ_API_KEY=
 GROQ_BASE_URL=https://api.groq.com/openai
-AI_MODEL_FAST=llama-3.1-8b-instant
-AI_MODEL_SMART=llama-3.3-70b-versatile
+AI_MODEL_FAST=openai/gpt-oss-20b
+AI_MODEL_SMART=openai/gpt-oss-120b
 AI_RATE_LIMIT_PER_MINUTE=20
 
 # AI embeddings - local ONNX (no key). Must match the vector column size.

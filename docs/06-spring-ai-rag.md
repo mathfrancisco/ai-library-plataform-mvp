@@ -26,8 +26,8 @@ does not match the model's dimensions.
 
 | Tier | Default | Operations |
 |---|---|---|
-| `FAST` | `llama-3.1-8b-instant` | `BOOK_SUMMARY`, `DISCOVERY_QUERY` (first attempt) |
-| `SMART` | `llama-3.3-70b-versatile` | `DOCUMENT_RAG`, `BOOK_RAG`, `LIBRARY_ASSISTANT`, `DISCOVERY_QUERY` retry after invalid output |
+| `FAST` | `openai/gpt-oss-20b` | `BOOK_SUMMARY`, `DISCOVERY_QUERY` (first attempt) |
+| `SMART` | `openai/gpt-oss-120b` | `DOCUMENT_RAG`, `BOOK_RAG`, `LIBRARY_ASSISTANT`, `DISCOVERY_QUERY` retry after invalid output |
 
 All calls go through `AiFacade`: enabled check, per-user and global rate limits, tier → model routing, request
 log, and provider error mapping ([05-integrations.md](05-integrations.md#groq--chat-model-provider)).

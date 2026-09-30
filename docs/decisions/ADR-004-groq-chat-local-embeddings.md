@@ -2,6 +2,10 @@
 
 **Status:** Accepted (implements SPEC-02)
 
+**Implementation update (2026-09-30):** Groq retired the previous model defaults for this account tier. Runtime
+defaults are `openai/gpt-oss-20b` (`FAST`) and `openai/gpt-oss-120b` (`SMART`); `AI_MODEL_FAST` and
+`AI_MODEL_SMART` remain the supported overrides.
+
 ## Context
 
 The project uses Groq for chat. Groq exposes an OpenAI-compatible Chat Completions API with tool calling and JSON
@@ -13,8 +17,8 @@ embeddings. CI must not need a paid or keyed provider.
 - Chat: Groq through the existing Spring AI OpenAI starter with a custom base URL
   (`https://api.groq.com/openai/v1`; the OpenAI SDK used by Spring AI 2.0 needs the `/v1`). Domain code only uses
   `ChatClient` through `AiFacade`.
-- Two model tiers per operation: `FAST` (`llama-3.1-8b-instant`) for summaries and discovery, `SMART`
-  (`llama-3.3-70b-versatile`) for the assistant and RAG answers; discovery retries once on `SMART` when the fast
+- Two model tiers per operation: `FAST` (`openai/gpt-oss-20b`) for summaries and discovery, `SMART`
+  (`openai/gpt-oss-120b`) for the assistant and RAG answers; discovery retries once on `SMART` when the fast
   model's structured output fails validation.
 - Embeddings: local ONNX `all-MiniLM-L6-v2` (384 dimensions) via `spring-ai-starter-model-transformers`, running in
   the JVM. The DJL PyTorch engine is excluded: the model runs on ONNX Runtime and PyTorch would download hundreds of

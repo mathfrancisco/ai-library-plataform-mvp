@@ -38,7 +38,7 @@ export const fixtures = {
     inputTokens: 120,
     outputTokens: 80,
     averageLatencyMs: 512.4,
-    byModel: [{ key: "llama-3.1-8b-instant", requests: 3, failures: 1, inputTokens: 120, outputTokens: 80 }],
+    byModel: [{ key: "openai/gpt-oss-20b", requests: 3, failures: 1, inputTokens: 120, outputTokens: 80 }],
     byOperation: [],
   },
 };

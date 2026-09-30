@@ -24,7 +24,7 @@ describe("Settings page", () => {
     fireEvent.change(name, { target: { value: "Ana Maria" } });
     fireEvent.click(screen.getByText("Save profile"));
     await waitFor(() => expect(body).toEqual({ displayName: "Ana Maria" }));
-    expect(await screen.findByText("llama-3.1-8b-instant")).toBeTruthy();
+    expect(await screen.findByText("openai/gpt-oss-20b")).toBeTruthy();
   });
 
   it("validates the password confirmation before sending", async () => {
