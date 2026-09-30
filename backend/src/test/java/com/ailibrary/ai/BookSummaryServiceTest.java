@@ -41,8 +41,9 @@ class BookSummaryServiceTest {
         Book book = new Book(
                 null, null, "Dune", null, "Frank Herbert", null, "Desert planet.", null, null, null, null, null, false);
         when(books.getEntity(book.getId())).thenReturn(book);
-        when(ai.properties()).thenReturn(new AiProperties(true, "openai", "m1", 30));
-        when(ai.complete(any(), eq("BOOK_SUMMARY"), anyString(), anyString())).thenReturn("Summary");
+        when(ai.properties()).thenReturn(new AiProperties(true, "groq", new AiProperties.Models("m1", "m2"), 30, 30));
+        when(ai.complete(any(), eq("BOOK_SUMMARY"), eq(ModelTier.FAST), anyString(), anyString()))
+                .thenReturn("Summary");
         when(cache.findByPromptHash(anyString())).thenReturn(Optional.empty());
 
         assertThat(service.summarize(user, book.getId(), SHORT)).isEqualTo("Summary");
@@ -52,7 +53,7 @@ class BookSummaryServiceTest {
                 .thenReturn(Optional.of(
                         new AiGeneration(user, "BOOK", book.getId(), "SUMMARY_SHORT", "h", "openai", "m1", "Cached")));
         assertThat(service.summarize(user, book.getId(), SHORT)).isEqualTo("Cached");
-        verify(ai, times(1)).complete(any(), any(), any(), any());
+        verify(ai, times(1)).complete(any(), any(), any(), any(), any());
     }
 
     @Test

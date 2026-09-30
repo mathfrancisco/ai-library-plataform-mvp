@@ -43,13 +43,15 @@ public class BookSummaryService {
                     "This book has no source description to summarize. Upload permitted full text for grounded RAG.");
         String source =
                 book.getTitle() + "\n" + Objects.toString(book.getAuthorNames(), "") + "\n" + book.getDescription();
-        String hash = cacheKey(bookId, source, ai.properties().model(), type);
+        String model = ai.properties().model(ModelTier.FAST);
+        String hash = cacheKey(bookId, source, model, type);
         var cached = cache.findByPromptHash(hash);
         if (cached.isPresent()) return cached.get().getResult();
 
         String result = ai.complete(
                 userId,
                 "BOOK_SUMMARY",
+                ModelTier.FAST,
                 "You summarize only the supplied source. Never invent book contents beyond it. "
                         + "Clearly state that this is based on catalog metadata/description. " + instruction(type),
                 source);
@@ -61,7 +63,7 @@ public class BookSummaryService {
                     "SUMMARY_" + type,
                     hash,
                     ai.properties().provider(),
-                    ai.properties().model(),
+                    model,
                     result));
         } catch (DataIntegrityViolationException concurrentInsert) {
             return cache.findByPromptHash(hash).map(AiGeneration::getResult).orElse(result);

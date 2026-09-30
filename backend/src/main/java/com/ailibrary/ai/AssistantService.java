@@ -28,6 +28,6 @@ public class AssistantService {
 
     public String ask(UUID userId, String message) {
         var tools = new LibraryAssistantTools(userId, library, reading);
-        return ai.tools(userId, "LIBRARY_ASSISTANT", SYSTEM_PROMPT, message, tools);
+        return ai.tools(userId, "LIBRARY_ASSISTANT", ModelTier.SMART, SYSTEM_PROMPT, message, tools);
     }
 }

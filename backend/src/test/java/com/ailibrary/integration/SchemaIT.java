@@ -8,7 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @EnabledIf(PostgresIntegrationTest.DATABASE_AVAILABLE)
-class SchemaIntegrationTest extends PostgresIntegrationTest {
+class SchemaIT extends PostgresIntegrationTest {
     @Autowired
     JdbcTemplate jdbc;
 

@@ -17,14 +17,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Runs the application's metadata filters through the real pgvector SQL converter and schema. */
 @EnabledIf(PostgresIntegrationTest.DATABASE_AVAILABLE)
-class PgVectorTenantIsolationTest extends PostgresIntegrationTest {
+class RagIsolationIT extends PostgresIntegrationTest {
     @Autowired
     JdbcTemplate jdbc;
 
     @Test
     void ownerAndDocumentFiltersAreEnforcedByPgvector() {
-        PgVectorStore store = PgVectorStore.builder(jdbc, new HashingEmbeddingModel(1536))
-                .dimensions(1536)
+        PgVectorStore store = PgVectorStore.builder(jdbc, new HashingEmbeddingModel(384))
+                .dimensions(384)
                 .initializeSchema(false)
                 .build();
         UUID alice = UUID.randomUUID(),

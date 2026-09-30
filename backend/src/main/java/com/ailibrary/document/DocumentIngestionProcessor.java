@@ -42,8 +42,7 @@ public class DocumentIngestionProcessor {
         docs.save(doc);
         try {
             VectorStore store = vectors.store()
-                    .orElseThrow(() -> new IllegalStateException(
-                            "AI/embeddings are disabled; enable AI_ENABLED to index documents"));
+                    .orElseThrow(() -> new IllegalStateException("Vector indexing is disabled (VECTOR_ENABLED=false)"));
             List<Document> parsed = new TikaDocumentReader(new FileSystemResource(service.path(doc))).read();
             List<Document> chunks = chunk(doc, parsed);
             if (chunks.isEmpty()) throw new IllegalStateException("No text could be extracted from this file");

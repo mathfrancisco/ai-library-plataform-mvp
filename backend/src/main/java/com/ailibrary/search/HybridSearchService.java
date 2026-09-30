@@ -1,6 +1,7 @@
 package com.ailibrary.search;
 
 import com.ailibrary.ai.AiFacade;
+import com.ailibrary.ai.ModelTier;
 import com.ailibrary.book.domain.Book;
 import com.ailibrary.book.repository.BookRepository;
 import com.ailibrary.book.service.BookFingerprint;
@@ -8,6 +9,7 @@ import com.ailibrary.book.service.BookMapper;
 import com.ailibrary.book.service.SimilarBookService;
 import com.ailibrary.catalog.CatalogBook;
 import com.ailibrary.catalog.CatalogService;
+import com.ailibrary.common.error.ApiException;
 import com.ailibrary.common.vector.VectorFilters;
 import com.ailibrary.common.vector.VectorStoreAccess;
 import com.ailibrary.search.SearchDtos.*;
@@ -71,24 +73,29 @@ public class HybridSearchService {
                 .toList();
     }
 
+    static final String DISCOVERY_PROMPT = "Convert a reader request into a concise book-search plan. "
+            + "query must contain provider-friendly keywords (genre, theme, setting, audience). "
+            + "Do not invent specific titles unless the user named them. "
+            + "language is an ISO 639 code when the user asked for one, otherwise null.";
+
     public DiscoveryResponse discover(UUID userId, String prompt, int limit) {
-        DiscoveryPlan plan;
-        try {
-            plan = ai.structured(
-                    userId,
-                    "DISCOVERY_QUERY",
-                    "Convert a reader request into a concise book-search plan. "
-                            + "query must contain provider-friendly keywords (genre, theme, setting, audience). "
-                            + "Do not invent specific titles unless the user named them. "
-                            + "language is an ISO 639 code when the user asked for one, otherwise null.",
-                    prompt,
-                    DiscoveryPlan.class);
-        } catch (RuntimeException ex) {
-            log.debug("Discovery planning failed, falling back to raw prompt: {}", ex.getMessage());
-            plan = new DiscoveryPlan(prompt, null, null, List.of());
-        }
+        DiscoveryPlan plan = plan(userId, prompt);
         String query = plan.query() == null || plan.query().isBlank() ? prompt : plan.query();
         return new DiscoveryResponse(plan, search(query, SearchMode.HYBRID, limit));
+    }
+
+    /** FAST model first; one SMART retry when the fast model's output fails schema validation. */
+    DiscoveryPlan plan(UUID userId, String prompt) {
+        for (ModelTier tier : List.of(ModelTier.FAST, ModelTier.SMART)) {
+            try {
+                return ai.structured(userId, "DISCOVERY_QUERY", tier, DISCOVERY_PROMPT, prompt, DiscoveryPlan.class);
+            } catch (ApiException unavailable) {
+                throw unavailable; // disabled, rate limited, timeout: surface to the client
+            } catch (RuntimeException invalidOutput) {
+                log.debug("Discovery plan with {} model failed: {}", tier, invalidOutput.getMessage());
+            }
+        }
+        return new DiscoveryPlan(prompt, null, null, List.of());
     }
 
     private List<Book> lexical(String query, int limit) {

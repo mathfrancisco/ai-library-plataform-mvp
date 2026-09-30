@@ -17,7 +17,7 @@ import org.testcontainers.utility.DockerImageName;
             "app.ai.enabled=false",
             "spring.ai.openai.api-key=disabled",
             "spring.ai.vectorstore.pgvector.initialize-schema=false",
-            "app.auth.admin-emails=" + ApiIntegrationTest.ADMIN_EMAIL
+            "app.auth.admin-emails=" + ApiIT.ADMIN_EMAIL
         })
 abstract class PostgresIntegrationTest {
     static final String DATABASE_AVAILABLE = "com.ailibrary.integration.PostgresIntegrationTest#databaseAvailable";

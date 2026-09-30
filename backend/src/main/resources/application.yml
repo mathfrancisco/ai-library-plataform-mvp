@@ -5,6 +5,10 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ailibrary}
     username: ${SPRING_DATASOURCE_USERNAME:ailibrary}
     password: ${SPRING_DATASOURCE_PASSWORD:ailibrary}
+    hikari:
+      # Tenant-filtered HNSW search needs iterative scans (pgvector >= 0.8). Set per connection because
+      # pooled connections can predate the ALTER DATABASE in V3. Older pgvector ignores the placeholder.
+      connection-init-sql: SET hnsw.iterative_scan = relaxed_order
   jpa:
     open-in-view: false
     hibernate:
@@ -20,22 +24,29 @@ spring:
       max-file-size: 25MB
       max-request-size: 25MB
   ai:
+    model:
+      chat: openai # Groq through its OpenAI-compatible API
+      embedding: transformers # local ONNX, no key
     openai:
-      api-key: ${OPENAI_API_KEY:disabled}
-      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${GROQ_API_KEY:disabled}
+      # The OpenAI SDK used by Spring AI 2.0 expects the versioned base path.
+      base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
       chat:
         options:
-          model: ${OPENAI_CHAT_MODEL:gpt-4.1-mini}
+          model: ${AI_MODEL_SMART:llama-3.3-70b-versatile}
           temperature: 0.2
-      embedding:
-        options:
-          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+          timeout: ${AI_TIMEOUT:PT45S}
+          max-retries: 1
+    embedding:
+      transformer:
+        cache:
+          directory: ${AI_EMBEDDING_CACHE_DIR:${java.io.tmpdir}/spring-ai-onnx}
     vectorstore:
       pgvector:
         initialize-schema: false
         index-type: HNSW
         distance-type: COSINE_DISTANCE
-        dimensions: ${AI_EMBEDDING_DIMENSIONS:1536}
+        dimensions: ${AI_EMBEDDING_DIMENSIONS:384}
 
 management:
   endpoints:
@@ -54,9 +65,15 @@ server:
 app:
   ai:
     enabled: ${AI_ENABLED:false}
-    provider: openai-compatible
-    model: ${OPENAI_CHAT_MODEL:gpt-4.1-mini}
-    max-requests-per-minute: ${AI_MAX_REQUESTS_PER_MINUTE:30}
+    provider: groq
+    models:
+      fast: ${AI_MODEL_FAST:llama-3.1-8b-instant}
+      smart: ${AI_MODEL_SMART:llama-3.3-70b-versatile}
+    rate-limit-per-minute: ${AI_RATE_LIMIT_PER_MINUTE:20}
+    global-rate-per-minute: ${AI_GLOBAL_RATE_PER_MINUTE:25}
+  vector:
+    # Embeddings run locally, so vector features do not depend on AI_ENABLED.
+    enabled: ${VECTOR_ENABLED:true}
   auth:
     jwt-secret: ${JWT_SECRET:change-me-with-at-least-32-characters-long-secret}
     access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:15}

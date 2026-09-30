@@ -16,7 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** HTTP-level checks for auth boundaries, owner isolation and the error envelope. */
 @EnabledIf(PostgresIntegrationTest.DATABASE_AVAILABLE)
-class ApiIntegrationTest extends PostgresIntegrationTest {
+class ApiIT extends PostgresIntegrationTest {
     static final String ADMIN_EMAIL = "admin-it@example.com";
     private static final ObjectMapper JSON = JsonMapper.builder().build();
     private final HttpClient http = HttpClient.newHttpClient();
@@ -77,6 +77,7 @@ class ApiIntegrationTest extends PostgresIntegrationTest {
         assertThat(invalid.status()).isEqualTo(400);
         assertThat(invalid.body().path("code").asString()).isEqualTo("VALIDATION_ERROR");
         Res aiOff = call("POST", "/api/ai/assistant", token, "{\"message\":\"hi\"}");
+        assertThat(aiOff.status()).isEqualTo(503);
         assertThat(aiOff.body().path("code").asString()).isEqualTo("AI_DISABLED");
     }
 
@@ -100,8 +101,8 @@ class ApiIntegrationTest extends PostgresIntegrationTest {
                 "/api/admin/books/reindex",
                 login.body().path("accessToken").asString(),
                 null);
-        // AI is disabled in tests, so the admin gets past authorization and hits the AI guard.
-        assertThat(reindex.body().path("code").asString()).isEqualTo("AI_DISABLED");
+        assertThat(reindex.status()).isEqualTo(200);
+        assertThat(reindex.body().path("indexed").asInt()).isGreaterThanOrEqualTo(1);
     }
 
     private String register(String name) throws Exception {
