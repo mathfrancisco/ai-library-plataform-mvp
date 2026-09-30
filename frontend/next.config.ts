@@ -1,7 +1,5 @@
 import type { NextConfig } from "next";
 
-/** Backend origin for the same-origin /api proxy; read at server start (runtime), not baked into the bundle. */
-const apiInternal = process.env.API_INTERNAL_URL ?? "http://localhost:8080";
 /** Optional direct API origin (only when NEXT_PUBLIC_API_URL is used instead of the proxy). */
 const directApi = process.env.NEXT_PUBLIC_API_URL ?? "";
 const isDev = process.env.NODE_ENV !== "production";
@@ -22,8 +20,9 @@ const csp = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  async rewrites() {
-    return [{ source: "/api/:path*", destination: `${apiInternal}/api/:path*` }];
+  experimental: {
+    // /api/* goes through src/proxy.ts, which buffers bodies; uploads are limited to 25 MB by the backend.
+    proxyClientMaxBodySize: "30mb",
   },
   async headers() {
     return [
