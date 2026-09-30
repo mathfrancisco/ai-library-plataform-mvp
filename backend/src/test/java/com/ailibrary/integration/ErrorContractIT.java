@@ -42,6 +42,15 @@ class ErrorContractIT extends PostgresIntegrationTest {
     }
 
     @Test
+    void openApiDocumentDescribesTheApi() throws Exception {
+        Res docs = call("GET", "/v3/api-docs", null, null);
+        assertThat(docs.status()).isEqualTo(200);
+        assertThat(docs.body().path("paths").has("/api/library/books/{bookId}")).isTrue();
+        assertThat(docs.body().path("paths").has("/api/documents/{id}/reingest"))
+                .isTrue();
+    }
+
+    @Test
     void ingestionExecutorDoesNotReplaceTheDefaultTaskExecutor() {
         assertThat(context.containsBean("applicationTaskExecutor")).isTrue();
         assertThat(context.containsBean("ingestionExecutor")).isTrue();

@@ -28,3 +28,9 @@ logging:
   level:
     root: INFO
     org.springframework.ai: WARN
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

@@ -46,6 +46,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/catalog/**", "/api/search", "/api/books/**")
                         .permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                        .permitAll() // only served when springdoc is enabled (not in prod)
                         .requestMatchers("/error")
                         .permitAll()
                         .anyRequest()

@@ -48,6 +48,14 @@ spring:
         distance-type: COSINE_DISTANCE
         dimensions: ${AI_EMBEDDING_DIMENSIONS:384}
 
+# OpenAPI (docs/04-api-contract.md links here): /v3/api-docs and /swagger-ui.html; disabled in the prod profile.
+springdoc:
+  api-docs:
+    enabled: ${APP_API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${APP_API_DOCS_ENABLED:true}
+  paths-to-match: /api/**
+
 management:
   endpoints:
     web:
